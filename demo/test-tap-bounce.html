@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tap-to-Bounce Sync Test</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      text-align: center;
+    }
+    h1 { font-size: 1.2rem; }
+    .subtitle { color: #64748b; font-size: 0.85rem; margin-bottom: 24px; }
+
+    .btn-row { display: flex; gap: 10px; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
+    button {
+      padding: 12px 24px;
+      font-size: 15px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #3b82f6;
+      color: #fff;
+    }
+    button:disabled { opacity: 0.3; }
+    button.secondary { background: #4b5563; }
+
+    .slider-row { display: flex; align-items: center; gap: 12px; margin: 20px 0; }
+    .slider-row input[type="range"] { flex: 1; accent-color: #3b82f6; }
+    .slider-row .value { font-family: monospace; font-size: 16px; min-width: 80px; text-align: right; }
+    .slider-row .btn-mini {
+      padding: 4px 12px; font-size: 13px; border-radius: 4px;
+      border: 1px solid #4b5563; background: #0d0d1a; color: #e0e0e0; cursor: pointer;
+    }
+
+    .toggle-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 12px 0; font-size: 14px; }
+    .toggle-row input { accent-color: #16a34a; width: 18px; height: 18px; }
+
+    .info-box {
+      background: #16162e; border-radius: 8px; padding: 12px 16px;
+      margin: 12px 0; font-size: 14px; text-align: left;
+    }
+    .info-box .label { color: #64748b; }
+    .info-box .val { font-family: monospace; font-weight: 600; }
+
+    #stage {
+      display: block; width: 100%; height: 320px;
+      background: #0d0d1a; border-radius: 8px; cursor: pointer;
+      touch-action: manipulation; user-select: none; -webkit-user-select: none;
+    }
+
+    .hint { color: #64748b; font-size: 0.8rem; margin-top: 8px; }
+    .hint a { color: #60a5fa; }
+    #log {
+      background: #0d0d1a; border-radius: 8px; padding: 10px; margin-top: 16px;
+      max-height: 150px; overflow-y: auto; font-family: monospace;
+      font-size: 11px; text-align: left; line-height: 1.7;
+    }
+    .log-info { color: #60a5fa; }
+    .log-success { color: #4ade80; }
+    .log-warn { color: #fbbf24; }
+  </style>
+</head>
+<body>
+  <h1>Tap-to-Bounce Sync Test</h1>
+  <div class="subtitle">Tap the screen: a click plays and the ball bounces. The bounce is delayed by your measured Bluetooth latency so it matches the moment you actually hear the click.</div>
+
+  <div class="btn-row">
+    <button id="initBtn">1. Initialize Audio</button>
+  </div>
+
+  <div class="info-box">
+    <div><span class="label">AudioContext state: </span><span class="val" id="ctxState">—</span></div>
+    <div><span class="label">Native outputLatency: </span><span class="val" id="nativeLat">—</span></div>
+    <div><span class="label">Measured BT delay (localStorage): </span><span class="val" id="savedLat">—</span></div>
+  </div>
+
+  <div class="hint" id="noSavedHint" style="display:none">
+    No saved delay yet — run <a href="test-bluetooth-latency.html">test-bluetooth-latency.html</a> first to measure your real Bluetooth delay, or just use the slider below.
+  </div>
+
+  <div class="slider-row">
+    <span style="font-size:13px; min-width:100px">Audio delay</span>
+    <button class="btn-mini" id="delayDown">-10 ms</button>
+    <input type="range" id="delaySlider" min="0" max="2000" step="5" value="0">
+    <button class="btn-mini" id="delayUp">+10 ms</button>
+    <span class="value" id="delayValue">0 ms</span>
+  </div>
+
+  <div class="toggle-row">
+    <input type="checkbox" id="compensateToggle" checked>
+    <label for="compensateToggle">Compensate visuals (delay the bounce by the audio delay)</label>
+  </div>
+
+  <canvas id="stage" width="560" height="320"></canvas>
+  <div class="hint">Click / tap the canvas or press <b>Space</b> to bounce. With compensation ON, the visual bounce waits for the Bluetooth-delayed click; toggle OFF to feel the desync.</div>
+
+  <div id="log"></div>
+
+  <script type="module">
+    import { createWebAudioSync, isSupported } from './dist/esm/index.js';
+
+    const $ = (id) => document.getElementById(id);
+    const logEl = $('log');
+
+    function log(msg, type = 'info') {
+      const div = document.createElement('div');
+      div.className = `log-${type}`;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    let sync = null;
+    let ctx = null;
+
+    // ── Delay slider (persisted like test-bluetooth-latency.html) ──
+    function getDelayMs() { return parseInt($('delaySlider').value, 10); }
+    function setDelayMs(v, save = true) {
+      v = Math.max(0, Math.min(2000, v));
+      $('delaySlider').value = v;
+      $('delayValue').textContent = `${v} ms`;
+      if (save) localStorage.setItem('btAudioDelayMs', String(v));
+    }
+    $('delaySlider').addEventListener('input', () => {
+      $('delayValue').textContent = `${getDelayMs()} ms`;
+      localStorage.setItem('btAudioDelayMs', String(getDelayMs()));
+    });
+    $('delayUp').addEventListener('click', () => setDelayMs(getDelayMs() + 10));
+    $('delayDown').addEventListener('click', () => setDelayMs(getDelayMs() - 10));
+
+    const saved = localStorage.getItem('btAudioDelayMs');
+    if (saved !== null) {
+      setDelayMs(parseInt(saved, 10), false);
+      $('savedLat').textContent = `${saved} ms`;
+      log(`Found saved delay: ${saved} ms`, 'info');
+    } else {
+      $('noSavedHint').style.display = 'block';
+      $('savedLat').textContent = 'not measured';
+    }
+
+    // ── Ball physics ──────────────────────────────────────────
+    const stage = $('stage');
+    const g = stage.getContext('2d');
+    const ball = { x: stage.width / 2, y: 80, vy: 0, r: 24 };
+    const GRAVITY = 2200;      // px/s^2
+    const RESTITUTION = 0.82;
+    const TAP_IMPULSE = 950;   // px/s upward
+    // Visual impulses scheduled in the future (performance.now() timebase)
+    const pending = [];
+
+    let lastT = null;
+    function frame(t) {
+      if (lastT === null) lastT = t;
+      const dt = Math.min(0.05, (t - lastT) / 1000);
+      lastT = t;
+
+      // Apply any visual impulses whose time has come
+      const now = performance.now();
+      for (let i = pending.length - 1; i >= 0; i--) {
+        if (pending[i].at <= now) {
+          ball.vy = -TAP_IMPULSE;
+          ball.x = pending[i].x;
+          pending.splice(i, 1);
+        }
+      }
+
+      ball.vy += GRAVITY * dt;
+      ball.y += ball.vy * dt;
+
+      const floor = stage.height - 12 - ball.r;
+      if (ball.y >= floor) {
+        ball.y = floor;
+        ball.vy = -Math.abs(ball.vy) * RESTITUTION;
+        if (Math.abs(ball.vy) < 60) ball.vy = 0; // settle
+      }
+      if (ball.x < ball.r) ball.x = ball.r;
+      if (ball.x > stage.width - ball.r) ball.x = stage.width - ball.r;
+
+      draw();
+      requestAnimationFrame(frame);
+    }
+
+    function draw() {
+      g.clearRect(0, 0, stage.width, stage.height);
+      // floor
+      g.fillStyle = '#334155';
+      g.fillRect(0, stage.height - 12, stage.width, 12);
+      // ball
+      const grad = g.createRadialGradient(ball.x - 8, ball.y - 8, 4, ball.x, ball.y, ball.r);
+      grad.addColorStop(0, '#93c5fd');
+      grad.addColorStop(1, '#2563eb');
+      g.beginPath();
+      g.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+      g.fillStyle = grad;
+      g.fill();
+    }
+    requestAnimationFrame(frame);
+
+    // ── Tap handling ──────────────────────────────────────────
+    function tap(clientX) {
+      if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const rect = stage.getBoundingClientRect();
+      const x = Math.max(ball.r, Math.min(stage.width - ball.r,
+        (clientX - rect.left) * (stage.width / rect.width)));
+
+      // Sound plays NOW on the audio clock; the browser/Bluetooth delays what you hear
+      sync.playTestTone(1800, 0.04);
+
+      // Visual bounce: immediately, or delayed by the measured audio latency
+      const compensate = $('compensateToggle').checked;
+      const delay = compensate ? getDelayMs() : 0;
+      pending.push({ at: performance.now() + delay, x });
+
+      log(`Tap: click now, bounce in ${delay} ms (compensation ${compensate ? 'ON' : 'OFF'})`,
+        delay > 0 ? 'warn' : 'info');
+    }
+
+    stage.addEventListener('pointerdown', (e) => { e.preventDefault(); tap(e.clientX); });
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !e.repeat) { e.preventDefault(); tap(stage.getBoundingClientRect().left + stage.getBoundingClientRect().width / 2 + (Math.random() * 80 - 40)); }
+    });
+
+    // ── Initialize ──────────────────────────────────────────
+    $('initBtn').addEventListener('click', async () => {
+      const ok = await isSupported();
+      if (!ok) { log('WebAudio not supported', 'warn'); return; }
+
+      sync = createWebAudioSync({ tier: 'oss' });
+      const success = await sync.initialize();
+      if (!success) { log('Init failed', 'warn'); return; }
+
+      ctx = sync.getAudioContext();
+      $('ctxState').textContent = ctx?.state ?? 'N/A';
+      const nativeLat = ctx && ctx.outputLatency !== undefined ? (ctx.outputLatency * 1000).toFixed(1) + ' ms' : 'N/A';
+      $('nativeLat').textContent = nativeLat;
+      log(`Initialized. state=${ctx?.state}, native outputLatency=${nativeLat}`, 'success');
+      log('Tap the canvas (or press Space) to bounce the ball.', 'info');
+
+      $('initBtn').disabled = true;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A/V Sync Test — Local Video with Bluetooth Compensation</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 720px;
+      margin: 30px auto;
+      padding: 20px;
+      background: #1a1a2e;
+      color: #e0e0e0;
+    }
+    h1 { font-size: 1.2rem; }
+    .subtitle { color: #64748b; font-size: 0.85rem; margin-bottom: 20px; }
+
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+    button {
+      padding: 10px 18px;
+      font-size: 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #3b82f6;
+      color: #fff;
+    }
+    button:disabled { opacity: 0.3; }
+    button.secondary { background: #4b5563; }
+    button.success { background: #16a34a; }
+
+    input[type="file"] { color: #e0e0e0; font-size: 13px; }
+
+    .slider-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
+    .slider-row input[type="range"] { flex: 1 1 160px; min-width: 0; width: 100%; accent-color: #3b82f6; }
+    .slider-row .value { font-family: monospace; font-size: 14px; min-width: 70px; text-align: right; }
+    .btn-mini {
+      padding: 4px 10px; font-size: 12px; border-radius: 4px;
+      border: 1px solid #4b5563; background: #0d0d1a; color: #e0e0e0; cursor: pointer;
+    }
+
+    .info-box {
+      background: #16162e; border-radius: 8px; padding: 10px 14px;
+      margin: 10px 0; font-size: 13px;
+    }
+    .info-box .label { color: #64748b; }
+    .info-box .val { font-family: monospace; font-weight: 600; }
+
+    #videoWrap {
+      position: relative;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 12px;
+      aspect-ratio: 16 / 9;
+      width: 100%;
+      max-width: 100%;
+      display: none;
+    }
+    #videoCanvas { width: 100%; height: 100%; display: block; }
+    #rawVideo { display: none; }
+    #placeholder {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #475569; font-size: 0.9rem;
+    }
+
+    .hint { color: #64748b; font-size: 0.8rem; margin-top: 6px; }
+
+    @media (max-width: 640px) {
+      body { margin: 12px auto; padding: 12px; }
+      h1 { font-size: 1.05rem; }
+      .btn-row { gap: 8px; }
+      button { padding: 9px 14px; font-size: 13px; }
+      .slider-row { gap: 6px; }
+      .slider-row span[style] { min-width: 0 !important; }
+      #log { max-height: 110px; }
+    }
+    #log {
+      background: #0d0d1a; border-radius: 8px; padding: 10px; margin-top: 14px;
+      max-height: 150px; overflow-y: auto; font-family: monospace;
+      font-size: 11px; line-height: 1.7;
+    }
+    .log-info { color: #60a5fa; }
+    .log-success { color: #4ade80; }
+    .log-warn { color: #fbbf24; }
+  </style>
+</head>
+<body>
+  <h1>A/V Sync Test — Local Video</h1>
+  <div class="subtitle">Compensate Bluetooth audio delay by delaying the video rendering on a canvas</div>
+
+  <div class="btn-row">
+    <input type="file" id="fileInput" accept="video/*">
+  </div>
+  <div class="hint">Drop any local video file with audio (e.g. an .mp4 with music or speech). The video's audio goes through Bluetooth (delayed); the canvas rendering is delayed to match.</div>
+
+  <div class="btn-row">
+    <button id="initBtn" disabled>1. Initialize Audio</button>
+  </div>
+
+  <div class="info-box">
+    <div><span class="label">AudioContext: </span><span class="val" id="ctxState">—</span></div>
+    <div><span class="label">Native outputLatency: </span><span class="val" id="nativeLat">—</span></div>
+    <div><span class="label">Video delay (compensation): </span><span class="val" id="delayLabel">0 ms</span></div>
+  </div>
+
+  <div class="slider-row">
+    <span style="font-size:13px; min-width:100px">Video delay</span>
+    <button class="btn-mini" id="delayDown">-10 ms</button>
+    <input type="range" id="delaySlider" min="0" max="2000" step="5" value="0">
+    <button class="btn-mini" id="delayUp">+10 ms</button>
+    <span class="value" id="delayValue">0 ms</span>
+  </div>
+  <div class="hint">Increase until the video's audio and picture feel in sync. With Bluetooth this will be 200–1000ms+. With wired audio, leave at 0.</div>
+
+  <div class="btn-row">
+    <button id="playBtn" disabled class="success">Play</button>
+    <button id="pauseBtn" disabled class="secondary">Pause</button>
+  </div>
+
+  <div id="videoWrap">
+    <div id="placeholder">Load a video file above</div>
+    <canvas id="videoCanvas" width="640" height="360"></canvas>
+    <video id="rawVideo" playsinline></video>
+  </div>
+
+  <div id="log"></div>
+
+  <script type="module">
+    import { createWebAudioSync, isSupported } from './dist/esm/index.js';
+
+    const $ = (id) => document.getElementById(id);
+    const logEl = $('log');
+
+    function log(msg, type = 'info') {
+      const div = document.createElement('div');
+      div.className = `log-${type}`;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    let sync = null;
+    let ctx = null;
+    let video = $('rawVideo');
+    let canvas = $('videoCanvas');
+    let canvasCtx = canvas.getContext('2d');
+    let rafId = null;
+    let frameBuffer = []; // {bitmap: ImageBitmap, time: number}
+    let lastCapture = 0;
+
+    function getDelayMs() { return parseInt($('delaySlider').value, 10); }
+    function setDelayMs(v) {
+      v = Math.max(0, Math.min(2000, v));
+      $('delaySlider').value = v;
+      $('delayValue').textContent = `${v} ms`;
+      $('delayLabel').textContent = `${v} ms`;
+    }
+
+    $('delaySlider').addEventListener('input', () => setDelayMs(getDelayMs()));
+    $('delayUp').addEventListener('click', () => setDelayMs(getDelayMs() + 10));
+    $('delayDown').addEventListener('click', () => setDelayMs(getDelayMs() - 10));
+
+    // ── File input ──────────────────────────────────────────
+    $('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      video.src = url;
+      $('videoWrap').style.display = 'block';
+      $('placeholder').style.display = 'none';
+      $('playBtn').disabled = false;
+      $('pauseBtn').disabled = false;
+      log(`Loaded video: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`, 'success');
+    });
+
+    // ── Initialize ──────────────────────────────────────────
+    $('initBtn').addEventListener('click', async () => {
+      const ok = await isSupported();
+      if (!ok) { log('WebAudio not supported', 'warn'); return; }
+
+      sync = createWebAudioSync({ tier: 'oss' });
+      const success = await sync.initialize();
+      if (!success) { log('Init failed', 'warn'); return; }
+
+      ctx = sync.getAudioContext();
+      $('ctxState').textContent = ctx?.state ?? 'N/A';
+      const nativeLat = ctx && ctx.outputLatency !== undefined ? (ctx.outputLatency * 1000).toFixed(1) + ' ms' : 'N/A';
+      $('nativeLat').textContent = nativeLat;
+      log(`Initialized. state=${ctx?.state}, native outputLatency=${nativeLat}`, 'success');
+
+      $('initBtn').disabled = true;
+    });
+
+    // ── Canvas rendering with delay ─────────────────────────
+    async function captureFrame() {
+      if (video.videoWidth === 0) return null;
+      const bmp = await createImageBitmap(video);
+      return bmp;
+    }
+
+    async function renderLoop() {
+      if (video.paused || video.ended || video.readyState < 2) {
+        rafId = requestAnimationFrame(renderLoop);
+        return;
+      }
+
+      const now = performance.now();
+      const delayMs = getDelayMs();
+
+      // Capture current frame at ~30fps
+      if (now - lastCapture >= 33) {
+        lastCapture = now;
+        const bmp = await captureFrame();
+        if (bmp) {
+          frameBuffer.push({ bitmap: bmp, time: now });
+        }
+        // Prune old frames (keep buffer for delayMs + 200ms)
+        const cutoff = now - delayMs - 200;
+        while (frameBuffer.length > 0 && frameBuffer[0].time < cutoff) {
+          frameBuffer[0].bitmap.close();
+          frameBuffer.shift();
+        }
+      }
+
+      // Draw the frame from `delayMs` ago
+      const targetTime = now - delayMs;
+      let best = null;
+      let bestDiff = Infinity;
+      for (const f of frameBuffer) {
+        const diff = Math.abs(f.time - targetTime);
+        if (diff < bestDiff) { bestDiff = diff; best = f; }
+      }
+      if (best) {
+        canvasCtx.drawImage(best.bitmap, 0, 0, canvas.width, canvas.height);
+      }
+
+      rafId = requestAnimationFrame(renderLoop);
+    }
+
+    // ── Play / Pause ────────────────────────────────────────
+    $('playBtn').addEventListener('click', async () => {
+      if (ctx && ctx.state === 'suspended') await ctx.resume();
+      video.play();
+      if (!rafId) rafId = requestAnimationFrame(renderLoop);
+      log(`Playing with ${getDelayMs()}ms video delay`, 'info');
+    });
+
+    $('pauseBtn').addEventListener('click', () => {
+      video.pause();
+      log('Paused', 'warn');
+    });
+
+    video.addEventListener('ended', () => {
+      log('Video ended', 'warn');
+    });
+
+    // Enable init button immediately
+    $('initBtn').disabled = false;
+  </script>
+</body>
+</html>
