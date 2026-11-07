@@ -8,46 +8,49 @@
 <style>
   :root { --bg:#0b1220; --panel:#12233d; --line:#1e3a5f; --text:#e8f1fb; --muted:#9fc3e8; --accent:#38e1ff; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
-  header { display:flex; align-items:center; gap:16px; padding:28px 6vw; border-bottom:1px solid var(--line); }
-  header img { height:56px; width:auto; }
-  header h1 { font-size:1.6rem; font-weight:700; letter-spacing:.5px; }
-  main { padding:48px 6vw 80px; max-width:1200px; margin:0 auto; }
-  .intro { color:var(--muted); max-width:70ch; margin-bottom:40px; }
+  body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); line-height:1.65; font-size:17.5px; }
+  header { display:flex; align-items:center; gap:18px; padding:34px 6vw; border-bottom:1px solid var(--line); }
+  header img { height:68px; width:auto; }
+  header h1 { font-size:2rem; font-weight:700; letter-spacing:.5px; }
+  main { padding:56px 6vw 90px; max-width:1320px; margin:0 auto; }
+  .intro { color:var(--muted); max-width:70ch; margin-bottom:48px; font-size:1.1rem; }
 
-  .top { display:grid; grid-template-columns:minmax(300px,1fr) minmax(340px,1.3fr); gap:24px; align-items:start; }
+  .top { display:grid; grid-template-columns:minmax(340px,1fr) minmax(380px,1.3fr); gap:32px; align-items:start; }
   .tile { background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; }
   .tile img { width:100%; height:auto; display:block; }
   .tile .body { padding:20px 22px 24px; display:flex; flex-direction:column; gap:12px; flex:1; }
-  .tile h2 { font-size:1.25rem; }
-  .tile p { color:var(--muted); font-size:.95rem; flex:1; }
-  .tile .links { display:flex; gap:12px; flex-wrap:wrap; }
-  a.btn { display:inline-block; padding:10px 18px; border-radius:8px; text-decoration:none; font-weight:600; font-size:.92rem; }
+  .tile h2 { font-size:1.5rem; }
+  .tile .body { padding:24px 26px 28px; gap:14px; }
+  .tile p { color:var(--muted); font-size:1.05rem; flex:1; }
+  .tile .links { display:flex; gap:14px; flex-wrap:wrap; }
+  a.btn { display:inline-block; padding:13px 22px; border-radius:9px; text-decoration:none; font-weight:600; font-size:1.02rem; }
   a.btn.primary { background:var(--accent); color:#06222b; }
   a.btn.ghost { border:1px solid var(--accent); color:var(--accent); }
 
   /* inline A/V test panel */
-  .test { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px 20px 20px; }
-  .test h2 { font-size:1.05rem; margin-bottom:4px; }
-  .test .subtitle { color:var(--muted); font-size:.82rem; margin-bottom:14px; }
-  .btn-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:10px 0; }
-  .test button { padding:9px 16px; font-size:13px; border:none; border-radius:6px; cursor:pointer; background:#3b82f6; color:#fff; }
+  .test { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px 24px 24px; }
+  .test h2 { font-size:1.25rem; margin-bottom:4px; }
+  .test .subtitle { color:var(--muted); font-size:.92rem; margin-bottom:16px; }
+  .btn-row { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:12px 0; }
+  .test button { padding:11px 19px; font-size:15px; border:none; border-radius:7px; cursor:pointer; background:#3b82f6; color:#fff; }
   .test button:disabled { opacity:.3; }
   .test button.success { background:#16a34a; }
-  .test input[type="file"] { color:var(--text); font-size:12px; max-width:100%; }
-  .info-box { background:#0d1626; border-radius:8px; padding:8px 12px; margin:8px 0; font-size:12px; }
+  .test input[type="file"] { color:var(--text); font-size:14px; max-width:100%; }
+  .info-box { background:#0d1626; border-radius:8px; padding:10px 14px; margin:10px 0; font-size:13.5px; }
   .info-box .label { color:var(--muted); }
   .info-box .val { font-family:monospace; font-weight:600; }
   .slider-row { display:flex; align-items:center; gap:8px; margin:10px 0; flex-wrap:wrap; }
   .slider-row input[type="range"] { flex:1 1 140px; min-width:0; accent-color:var(--accent); }
-  .slider-row .value { font-family:monospace; font-size:13px; min-width:64px; text-align:right; }
-  .btn-mini { padding:4px 10px !important; font-size:12px !important; border-radius:4px; border:1px solid var(--line) !important; background:#0d1626 !important; color:var(--text) !important; cursor:pointer; }
+  .slider-row .value { font-family:monospace; font-size:15px; min-width:72px; text-align:right; }
+  .slider-row span { font-size:14px; }
+  .btn-mini { padding:6px 12px !important; font-size:13px !important; border-radius:5px; border:1px solid var(--line) !important; background:#0d1626 !important; color:var(--text) !important; cursor:pointer; }
   #avVideoWrap { position:relative; background:#000; border-radius:8px; overflow:hidden; margin-top:10px; aspect-ratio:16/9; width:100%; display:none; }
   #avCanvas { width:100%; height:100%; display:block; }
   #avRawVideo { position:fixed; bottom:0; right:0; width:2px; height:2px; opacity:0.01; pointer-events:none; }
   #avPlaceholder { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#475569; font-size:.85rem; }
-  .hint { color:var(--muted); font-size:.78rem; margin-top:6px; }
-  #avLog { background:#0d1626; border-radius:8px; padding:8px; margin-top:12px; max-height:120px; overflow-y:auto; font-family:monospace; font-size:11px; line-height:1.7; }
+  .hint { color:var(--muted); font-size:.85rem; margin-top:6px; }
+  #avLog { background:#0d1626; border-radius:8px; padding:10px; margin-top:14px; max-height:140px; overflow-y:auto; font-family:monospace; font-size:12px; line-height:1.7; }
+  .more { color:var(--muted); font-size:1rem; margin-top:36px; }
   .log-info { color:#60a5fa; } .log-success { color:#4ade80; } .log-warn { color:#fbbf24; }
 
   @media (max-width: 900px) {
@@ -125,6 +128,8 @@
       <div id="avLog"></div>
     </div>
   </div>
+
+  <p class="more">More runnable examples live in the <a href="https://github.com/honeyplunge/web-audio-sync" style="color:var(--accent)">GitHub repository</a>: <code>test-tap-bounce.html</code> (tap-to-the-beat rhythm game demo), <code>test-bluetooth-latency.html</code> (measure your real Bluetooth delay with a flash+click test), and <code>test-audio.html</code> (full latency detection workflow).</p>
 </main>
 <footer>
   <span>© 2026 honeyplunge</span>
