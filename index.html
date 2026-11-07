@@ -44,7 +44,7 @@
   .btn-mini { padding:4px 10px !important; font-size:12px !important; border-radius:4px; border:1px solid var(--line) !important; background:#0d1626 !important; color:var(--text) !important; cursor:pointer; }
   #avVideoWrap { position:relative; background:#000; border-radius:8px; overflow:hidden; margin-top:10px; aspect-ratio:16/9; width:100%; display:none; }
   #avCanvas { width:100%; height:100%; display:block; }
-  #avRawVideo { display:none; }
+  #avRawVideo { position:fixed; bottom:0; right:0; width:2px; height:2px; opacity:0.01; pointer-events:none; }
   #avPlaceholder { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#475569; font-size:.85rem; }
   .hint { color:var(--muted); font-size:.78rem; margin-top:6px; }
   #avLog { background:#0d1626; border-radius:8px; padding:8px; margin-top:12px; max-height:120px; overflow-y:auto; font-family:monospace; font-size:11px; line-height:1.7; }
@@ -119,7 +119,7 @@
       <div id="avVideoWrap">
         <div id="avPlaceholder">Load a video file above</div>
         <canvas id="avCanvas" width="640" height="360"></canvas>
-        <video id="avRawVideo" playsinline></video>
+        <video id="avRawVideo" playsinline webkit-playsinline></video>
       </div>
 
       <div id="avLog"></div>
@@ -194,12 +194,14 @@
     if (now - lastCapture >= 33) {
       lastCapture = now;
       if (video.videoWidth > 0) {
-        const bmp = await createImageBitmap(video);
-        frameBuffer.push({ bitmap: bmp, time: now });
+        let bmp = null;
+        try { bmp = await createImageBitmap(video); } catch { bmp = null; }
+        if (bmp) frameBuffer.push({ bitmap: bmp, time: now, raw: false });
+        else frameBuffer.push({ bitmap: video, time: now, raw: true });
       }
       const cutoff = now - delayMs - 200;
       while (frameBuffer.length > 0 && frameBuffer[0].time < cutoff) {
-        frameBuffer[0].bitmap.close();
+        if (!frameBuffer[0].raw) frameBuffer[0].bitmap.close();
         frameBuffer.shift();
       }
     }
