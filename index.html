@@ -116,7 +116,7 @@
         <button id="avPauseBtn" disabled style="background:#4b5563">Pause</button>
       </div>
 
-      <div id="avVideoWrap">
+      <div id="avVideoWrap" style="aspect-ratio:16/9">
         <div id="avPlaceholder">Load a video file above</div>
         <canvas id="avCanvas" width="640" height="360"></canvas>
         <video id="avRawVideo" playsinline webkit-playsinline></video>
@@ -165,6 +165,14 @@
     const file = e.target.files[0];
     if (!file) return;
     video.src = URL.createObjectURL(file);
+    video.addEventListener('loadedmetadata', () => {
+      if (video.videoWidth > 0) {
+        const scale = Math.min(1, 1280 / video.videoWidth);
+        canvas.width = Math.round(video.videoWidth * scale);
+        canvas.height = Math.round(video.videoHeight * scale);
+        $('avVideoWrap').style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+      }
+    }, { once: true });
     $('avVideoWrap').style.display = 'block';
     $('avPlaceholder').style.display = 'none';
     $('avPlayBtn').disabled = false;
@@ -215,9 +223,12 @@
     rafId = requestAnimationFrame(renderLoop);
   }
 
-  $('avPlayBtn').addEventListener('click', async () => {
-    if (ctx && ctx.state === 'suspended') await ctx.resume();
-    video.play();
+  $('avPlayBtn').addEventListener('click', () => {
+    // Start playback synchronously within the user gesture (iOS requirement),
+    // then resume the AudioContext
+    const p = video.play();
+    if (p && p.catch) p.catch((e) => log(`play() rejected: ${e.name}`, 'warn'));
+    if (ctx && ctx.state === 'suspended') ctx.resume();
     if (!rafId) rafId = requestAnimationFrame(renderLoop);
     log(`Playing with ${getDelayMs()}ms video delay`, 'info');
   });
