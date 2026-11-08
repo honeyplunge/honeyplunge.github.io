@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://honeyplunge.github.io/sitemap.xml
