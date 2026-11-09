@@ -191,8 +191,8 @@
   const $ = (id) => document.getElementById(id);
 
   /* ── Rhythm game (OSS only) ─────────────────────────── */
-  const SUB = 0.5;             // seconds between sub-beeps within a 2s bar
-  const BAR = 2.0;             // seconds per bar; downbeat at bar start (long enough to avoid aliasing ~1.1s BT delay)
+  const BAR = 4.0;             // seconds per bar; downbeat at bar start (long enough to avoid aliasing even large BT delay)
+  const SUB = BAR / 4;         // seconds between sub-beeps within a bar (3 sub-beeps per bar)
   const COUNT_IN = 8;          // calibration downbeats (one per bar)
   const BEAT_COUNT = 8;        // bars in the main round
   let gSync = null, gCtx = null;
@@ -260,7 +260,7 @@
     setBeatText('Get ready…', 'var(--muted)');
     // count-in text colors: first 4 bars red, remaining 4 orange
     const countColor = (i) => (i < 4 ? '#f87171' : '#fb923c');
-    // Phase 1: count-in — one accented downbeat per 2s bar, tap only on those
+    // Phase 1: count-in — one accented downbeat per 4s bar, tap only on those
     for (let i = 0; i < COUNT_IN; i++) {
       const bt = t0 + i * BAR;
       beats.push(bt);
@@ -278,7 +278,7 @@
       measuredLatMs = currentAvgLatMs();
       emaLat = measuredLatMs;
       $('latVal').textContent = `${measuredLatMs.toFixed(0)} ms`;
-      $('phaseVal').textContent = 'Go! Tap only on the green downbeat (every 2 s)';
+      $('phaseVal').textContent = 'Go! Tap only on the green downbeat (every 4 s)';
       setBeatText('Game on!', '#4ade80');
       for (let i = 0; i < BEAT_COUNT; i++) {
         const barStart = t1 + i * BAR;
