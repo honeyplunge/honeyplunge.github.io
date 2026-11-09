@@ -26,20 +26,35 @@
   main { padding:56px 6vw 90px; max-width:1320px; margin:0 auto; }
   .intro { color:var(--muted); max-width:70ch; margin-bottom:48px; font-size:1.1rem; }
 
-  .top { display:grid; grid-template-columns:minmax(340px,1fr) minmax(380px,1.3fr); gap:32px; align-items:start; }
+  .top { display:grid; grid-template-columns:minmax(340px,1fr) minmax(380px,1.3fr); gap:32px; align-items:stretch; }
   .tile { background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; }
-  .tile img { width:100%; height:auto; display:block; }
-  .tile .body { padding:20px 22px 24px; display:flex; flex-direction:column; gap:12px; flex:1; }
+  .tile > img { width:100%; height:auto; display:block; }
+  .tile .body { padding:24px 26px 28px; display:flex; flex-direction:column; gap:14px; flex:1; }
   .tile h2 { font-size:1.5rem; }
-  .tile .body { padding:24px 26px 28px; gap:14px; }
   .tile p { color:var(--muted); font-size:1.05rem; flex:1; }
   .tile .links { display:flex; gap:14px; flex-wrap:wrap; }
   a.btn { display:inline-block; padding:13px 22px; border-radius:9px; text-decoration:none; font-weight:600; font-size:1.02rem; }
   a.btn.primary { background:var(--accent); color:#06222b; }
   a.btn.ghost { border:1px solid var(--accent); color:var(--accent); }
 
-  /* inline A/V test panel */
-  .test { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px 24px 24px; }
+  /* rhythm game tile */
+  .game { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px 24px 24px; display:flex; flex-direction:column; gap:12px; }
+  .game h2 { font-size:1.25rem; }
+  .game .subtitle { color:var(--muted); font-size:.92rem; }
+  #beatDot { width:100%; height:56px; border-radius:10px; background:#0d1626; border:1px solid var(--line); transition:background .05s; }
+  #beatDot.on { background:var(--accent); }
+  #tapBtn { padding:18px; font-size:1.3rem; font-weight:700; border:none; border-radius:10px; background:var(--accent); color:#06222b; cursor:pointer; }
+  #tapBtn:disabled { opacity:.35; cursor:default; }
+  .game .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; font-size:.95rem; }
+  .game button.small { padding:9px 16px; font-size:.9rem; border:none; border-radius:7px; background:#3b82f6; color:#fff; cursor:pointer; }
+  .game button.small:disabled { opacity:.35; }
+  .game label { display:flex; gap:6px; align-items:center; color:var(--muted); font-size:.9rem; }
+  .stat { background:#0d1626; border-radius:8px; padding:10px 14px; font-size:.95rem; }
+  .stat .label { color:var(--muted); }
+  .stat .val { font-family:monospace; font-weight:600; }
+
+  /* full-width A/V test below */
+  .test { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px 24px 24px; margin-top:32px; }
   .test h2 { font-size:1.25rem; margin-bottom:4px; }
   .test .subtitle { color:var(--muted); font-size:.92rem; margin-bottom:16px; }
   .btn-row { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:12px 0; }
@@ -58,11 +73,11 @@
   #avVideoWrap { position:relative; background:#000; border-radius:8px; overflow:hidden; margin-top:10px; aspect-ratio:16/9; width:100%; display:none; }
   #avCanvas { width:100%; height:100%; display:block; }
   #avRawVideo { position:fixed; bottom:0; right:0; width:2px; height:2px; opacity:0.01; pointer-events:none; }
-  #avPlaceholder { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#475569; font-size:.85rem; }
+  #avPlaceholder { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#475569; font-size:.9rem; }
   .hint { color:var(--muted); font-size:.85rem; margin-top:6px; }
   #avLog { background:#0d1626; border-radius:8px; padding:10px; margin-top:14px; max-height:140px; overflow-y:auto; font-family:monospace; font-size:12px; line-height:1.7; }
-  .more { color:var(--muted); font-size:1rem; margin-top:36px; }
   .log-info { color:#60a5fa; } .log-success { color:#4ade80; } .log-warn { color:#fbbf24; }
+  .more { color:var(--muted); font-size:1rem; margin-top:36px; }
 
   @media (max-width: 900px) {
     .top { grid-template-columns:1fr; }
@@ -70,10 +85,10 @@
   @media (max-width: 640px) {
     header { padding:18px 5vw; } header img { height:42px; }
     main { padding:28px 5vw 56px; }
-    .test { padding:14px; }
+    .game, .test { padding:14px; }
     #avLog { max-height:90px; }
   }
-  footer { padding:24px 6vw; border-top:1px solid var(--line); color:var(--muted); font-size:.85rem; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+  footer { padding:24px 6vw; border-top:1px solid var(--line); color:var(--muted); font-size:.9rem; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
 </style>
 </head>
 <body>
@@ -97,47 +112,60 @@
       </div>
     </div>
 
-    <div class="test">
-      <h2>A/V Sync Test — try it here</h2>
-      <div class="subtitle">Drop a local video file: its sound plays through your (possibly Bluetooth-delayed) output while the picture renders on a canvas with an adjustable delay, so you can align them by ear.</div>
-
-      <div class="btn-row">
-        <input type="file" id="avFileInput" accept="video/*">
+    <div class="game">
+      <h2>Rhythm test — feel your latency</h2>
+      <div class="subtitle">Tap the button (or press Space) exactly on each beat you <em>hear</em>. On Bluetooth the beat arrives late — watch how compensation changes your score.</div>
+      <div id="beatDot"></div>
+      <button id="tapBtn" disabled>TAP ON THE BEAT</button>
+      <div class="row">
+        <button class="small" id="gameStartBtn">Start</button>
+        <label><input type="checkbox" id="compensateChk" checked> compensate latency</label>
       </div>
-      <div class="hint">Any local video with audio (e.g. an .mp4 with music or speech).</div>
-
-      <div class="btn-row">
-        <button id="avInitBtn" disabled>Initialize Audio</button>
-      </div>
-
-      <div class="info-box">
-        <div><span class="label">AudioContext: </span><span class="val" id="avCtxState">—</span></div>
-        <div><span class="label">Native outputLatency: </span><span class="val" id="avNativeLat">—</span></div>
-        <div><span class="label">Video delay (compensation): </span><span class="val" id="avDelayLabel">0 ms</span></div>
-      </div>
-
-      <div class="slider-row">
-        <span style="font-size:12px">Video delay</span>
-        <button class="btn-mini" id="avDelayDown">-10 ms</button>
-        <input type="range" id="avDelaySlider" min="0" max="2000" step="5" value="0">
-        <button class="btn-mini" id="avDelayUp">+10 ms</button>
-        <span class="value" id="avDelayValue">0 ms</span>
-      </div>
-      <div class="hint">Increase until audio and picture feel in sync. Bluetooth: 200–1000 ms+. Wired audio: leave at 0.</div>
-
-      <div class="btn-row">
-        <button id="avPlayBtn" disabled class="success">Play</button>
-        <button id="avPauseBtn" disabled style="background:#4b5563">Pause</button>
-      </div>
-
-      <div id="avVideoWrap" style="aspect-ratio:16/9">
-        <div id="avPlaceholder">Load a video file above</div>
-        <canvas id="avCanvas" width="640" height="360"></canvas>
-        <video id="avRawVideo" playsinline webkit-playsinline></video>
-      </div>
-
-      <div id="avLog"></div>
+      <div class="stat"><span class="label">Measured audio delay: </span><span class="val" id="latVal">—</span></div>
+      <div class="stat"><span class="label">Score: </span><span class="val" id="scoreVal">—</span> <span class="label">(perfect ≤60ms, good ≤120ms)</span></div>
     </div>
+  </div>
+
+  <div class="test">
+    <h2>A/V Sync Test — try it here</h2>
+    <div class="subtitle">Drop a local video file: its sound plays through your (possibly Bluetooth-delayed) output while the picture renders on a canvas with an adjustable delay, so you can align them by ear.</div>
+
+    <div class="btn-row">
+      <input type="file" id="avFileInput" accept="video/*">
+    </div>
+    <div class="hint">Any local video with audio (e.g. an .mp4 with music or speech).</div>
+
+    <div class="btn-row">
+      <button id="avInitBtn" disabled>Initialize Audio</button>
+    </div>
+
+    <div class="info-box">
+      <div><span class="label">AudioContext: </span><span class="val" id="avCtxState">—</span></div>
+      <div><span class="label">Native outputLatency: </span><span class="val" id="avNativeLat">—</span></div>
+      <div><span class="label">Video delay (compensation): </span><span class="val" id="avDelayLabel">0 ms</span></div>
+    </div>
+
+    <div class="slider-row">
+      <span>Video delay</span>
+      <button class="btn-mini" id="avDelayDown">-10 ms</button>
+      <input type="range" id="avDelaySlider" min="0" max="2000" step="5" value="0">
+      <button class="btn-mini" id="avDelayUp">+10 ms</button>
+      <span class="value" id="avDelayValue">0 ms</span>
+    </div>
+    <div class="hint">Increase until audio and picture feel in sync. Bluetooth: 200–1000 ms+. Wired audio: leave at 0.</div>
+
+    <div class="btn-row">
+      <button id="avPlayBtn" disabled class="success">Play</button>
+      <button id="avPauseBtn" disabled style="background:#4b5563">Pause</button>
+    </div>
+
+    <div id="avVideoWrap" style="aspect-ratio:16/9">
+      <div id="avPlaceholder">Load a video file above</div>
+      <canvas id="avCanvas" width="640" height="360"></canvas>
+      <video id="avRawVideo" playsinline webkit-playsinline></video>
+    </div>
+
+    <div id="avLog"></div>
   </div>
 
   <p class="more">More runnable examples live in the <a href="https://github.com/honeyplunge/web-audio-sync" style="color:var(--accent)">GitHub repository</a>: <code>test-tap-bounce.html</code> (tap-to-the-beat rhythm game demo), <code>test-bluetooth-latency.html</code> (measure your real Bluetooth delay with a flash+click test), and <code>test-audio.html</code> (full latency detection workflow).</p>
@@ -151,6 +179,114 @@
   import { createWebAudioSync, isSupported } from './demo/dist/esm/index.js';
 
   const $ = (id) => document.getElementById(id);
+
+  /* ── Rhythm game (OSS only) ─────────────────────────── */
+  const BEAT_INTERVAL = 0.6;   // seconds between beats
+  const BEAT_COUNT = 16;
+  let gSync = null, gCtx = null;
+  let beats = [];              // scheduled beat times on the audio clock
+  let taps = [];               // tap times on the audio clock
+  let playing = false;
+  let beatTimers = [];
+
+  function playClick(t) {
+    const osc = gCtx.createOscillator();
+    const gain = gCtx.createGain();
+    osc.frequency.value = 1000;
+    gain.gain.setValueAtTime(0.25, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    osc.connect(gain).connect(gCtx.destination);
+    osc.start(t); osc.stop(t + 0.07);
+  }
+
+  function flash(ms) {
+    const dot = $('beatDot');
+    dot.classList.add('on');
+    setTimeout(() => dot.classList.remove('on'), Math.min(ms, 120));
+  }
+
+  function startGame() {
+    taps = []; beats = []; playing = true;
+    $('scoreVal').textContent = '—';
+    $('latVal').textContent = '—';
+    $('tapBtn').disabled = false;
+    $('gameStartBtn').disabled = true;
+    const t0 = gCtx.currentTime + 0.5;
+    for (let i = 0; i < BEAT_COUNT; i++) {
+      const bt = t0 + i * BEAT_INTERVAL;
+      beats.push(bt);
+      playClick(bt);
+      // visual flash aligned via audio clock
+      const delayMs = (bt - gCtx.currentTime) * 1000;
+      beatTimers.push(setTimeout(() => flash(delayMs), Math.max(0, delayMs)));
+    }
+    beatTimers.push(setTimeout(endGame, (t0 + BEAT_COUNT * BEAT_INTERVAL - gCtx.currentTime) * 1000 + 400));
+  }
+
+  function judge(tapT) {
+    // nearest beat
+    let best = beats[0], bd = Infinity;
+    for (const b of beats) { const d = Math.abs(tapT - b); if (d < bd) { bd = d; best = b; } }
+    if (bd > BEAT_INTERVAL / 2) return null; // not near any beat
+    const compensate = $('compensateChk').checked;
+    let err = (tapT - best) * 1000; // ms; positive = tapped late
+    const avgLat = taps.length ? taps.reduce((a, t) => a + t, 0) / taps.length : 0;
+    if (compensate && avgLat) err -= avgLat * 1000;
+    return { rawErr: (tapT - best) * 1000, err };
+  }
+
+  function onTap() {
+    if (!playing || !gCtx) return;
+    const tapT = gCtx.currentTime;
+    taps.push(tapT);
+    const j = judge(tapT);
+    if (j) updateStats(j);
+  }
+
+  function updateStats(j) {
+    const avgRaw = taps.reduce((a, t, i) => {
+      let best = beats[0], bd = Infinity;
+      for (const b of beats) { const d = Math.abs(t - b); if (d < bd) { bd = d; best = b; } }
+      return a + (t - best) * 1000;
+    }, 0) / taps.length;
+    $('latVal').textContent = `${avgRaw.toFixed(0)} ms`;
+    const compensate = $('compensateChk').checked;
+    let score = 0, n = 0;
+    for (const t of taps) {
+      let best = beats[0], bd = Infinity;
+      for (const b of beats) { const d = Math.abs(t - b); if (d < bd) { bd = d; best = b; } }
+      let err = (t - best) * 1000;
+      if (compensate) err -= avgRaw;
+      if (Math.abs(err) <= 60) score += 100; else if (Math.abs(err) <= 120) score += 50;
+      n++;
+    }
+    $('scoreVal').textContent = n ? `${score} pts / ${n} taps` : '—';
+  }
+
+  function endGame() {
+    playing = false;
+    beatTimers.forEach(clearTimeout); beatTimers = [];
+    $('tapBtn').disabled = true;
+    $('gameStartBtn').disabled = false;
+    $('gameStartBtn').textContent = 'Restart';
+  }
+
+  $('gameStartBtn').addEventListener('click', async () => {
+    if (!gSync) {
+      if (!(await isSupported())) return;
+      gSync = createWebAudioSync({ tier: 'oss' });
+      await gSync.initialize();
+      gCtx = gSync.getAudioContext();
+    }
+    if (gCtx.state === 'suspended') await gCtx.resume();
+    startGame();
+  });
+  $('tapBtn').addEventListener('click', onTap);
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !e.repeat) { e.preventDefault(); onTap(); }
+  });
+
+  /* ── A/V sync test ──────────────────────────────────── */
   const logEl = $('avLog');
   function log(msg, type = 'info') {
     const div = document.createElement('div');
@@ -240,8 +376,6 @@
   }
 
   $('avPlayBtn').addEventListener('click', () => {
-    // Start playback synchronously within the user gesture (iOS requirement),
-    // then resume the AudioContext
     const p = video.play();
     if (p && p.catch) p.catch((e) => log(`play() rejected: ${e.name}`, 'warn'));
     if (ctx && ctx.state === 'suspended') ctx.resume();
