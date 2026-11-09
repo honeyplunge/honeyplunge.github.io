@@ -41,16 +41,8 @@
   .game { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px 24px 24px; display:flex; flex-direction:column; gap:12px; }
   .game h2 { font-size:1.25rem; }
   .game .subtitle { color:var(--muted); font-size:.92rem; }
-  #beatDot { width:100%; height:56px; border-radius:10px; background:#0d1626; border:1px solid var(--line); transition:background .05s; position:relative; overflow:hidden; }
-  #beatDot.on { background:var(--accent); }
-  #playfield { position:relative; width:100%; height:180px; border-radius:10px; background:#0d1626; border:1px solid var(--line); overflow:hidden; }
-  #hitLine { position:absolute; left:0; right:0; top:24px; height:3px; background:var(--accent); opacity:.7; }
-  .bubble { position:absolute; width:44px; height:44px; border-radius:50%; background:radial-gradient(circle at 35% 30%, hsl(var(--h) 90% 80%), hsl(var(--h) 85% 55%) 60%, hsl(var(--h) 80% 35%)); box-shadow:0 0 14px hsl(var(--h) 90% 60% / .5); transform:translate(-50%,-50%); }
-  .bubble.miss { background:radial-gradient(circle at 35% 30%, #9aa4b2, #4b5563 60%, #1f2937); box-shadow:none; }
-  .bubble.burst { animation:burst .35s forwards; }
-  @keyframes burst { to { transform:translate(-50%,-50%) scale(2.2); opacity:0; } }
-  .pop { position:absolute; width:8px; height:8px; border-radius:50%; background:var(--accent); pointer-events:none; animation:pop .4s forwards; }
-  @keyframes pop { to { transform:translate(var(--dx), var(--dy)) scale(.2); opacity:0; } }
+  #beatDot { width:100%; height:72px; border-radius:10px; background:#0d1626; border:2px solid var(--line); transition:background .05s, border-color .05s; }
+  #beatDot.on { background:var(--accent); border-color:var(--accent); }
   #tapBtn { padding:18px; font-size:1.3rem; font-weight:700; border:none; border-radius:10px; background:var(--accent); color:#06222b; cursor:pointer; }
   #tapBtn:disabled { opacity:.35; cursor:default; }
   .game .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; font-size:.95rem; }
@@ -122,8 +114,7 @@
 
     <div class="game">
       <h2>Rhythm Game — Feel your latency</h2>
-      <div class="subtitle">Tap the button (or press Space) exactly when the bubble crosses the line — on each beat you <em>hear</em>. On Bluetooth the beat arrives late; watch how compensation changes your score.</div>
-      <div id="playfield"><div id="hitLine"></div></div>
+      <div class="subtitle">Tap the button (or press Space) exactly when the bar flashes — on each beat you <em>hear</em>. On Bluetooth the beat arrives late; watch how compensation changes your score.</div>
       <div id="beatDot"></div>
       <button id="tapBtn" disabled>TAP ON THE BEAT</button>
       <div class="row">
@@ -225,7 +216,6 @@
     setTimeout(() => dot.classList.remove('on'), Math.min(ms, 120));
   }
 
-  const liveBubbles = []; // {el, beat}
   function currentAvgLatMs() {
     if (!taps.length || !beats.length) return 0;
     let sum = 0, n = 0;
@@ -235,54 +225,6 @@
       if (bd <= BEAT_INTERVAL / 2) { sum += (t - best) * 1000; n++; }
     }
     return n ? sum / n : 0;
-  }
-  function spawnBubble(bt) {
-    const field = $('playfield');
-    const el = document.createElement('div');
-    el.className = 'bubble';
-    el.style.setProperty('--h', Math.floor(Math.random() * 360));
-    el.style.left = `${50 + (Math.random() * 30 - 15)}%`;
-    el.style.top = '100%';
-    field.appendChild(el);
-    const dur = (bt - gCtx.currentTime) * 1000;
-    // With compensation on, delay the visual so the bubble crosses the line
-    // when the beat is actually HEARD (beat + measured latency), not when scheduled
-    const visDelay = Math.max(0, phase === 'bubbles' ? emaLat : measuredLatMs); // align visuals to the heard beat, tracking drift live
-    el.animate(
-      [{ top: '100%' }, { top: '27px' }],
-      { duration: Math.max(50, dur), delay: visDelay, easing: 'linear', fill: 'forwards' }
-    );
-    liveBubbles.push({ el, beat: bt });
-    // remove shortly after the (audible) beat passes
-    setTimeout(() => {
-      const i = liveBubbles.findIndex(b => b.el === el);
-      if (i >= 0) {
-        if (!el.classList.contains('burst') && !el.classList.contains('miss')) el.classList.add('miss');
-        liveBubbles.splice(i, 1);
-        setTimeout(() => el.remove(), 400);
-      }
-    }, Math.max(50, dur) + visDelay + 250);
-  }
-
-  function burstBubble(el) {
-    el.classList.remove('miss');
-    el.classList.add('burst');
-    const rect = el.getBoundingClientRect();
-    const field = $('playfield').getBoundingClientRect();
-    for (let i = 0; i < 10; i++) {
-      const p = document.createElement('div');
-      p.className = 'pop';
-      p.style.background = `hsl(${el.style.getPropertyValue('--h') || 190} 90% 60%)`;
-      const ang = Math.random() * Math.PI * 2;
-      const dist = 40 + Math.random() * 50;
-      p.style.setProperty('--dx', `${Math.cos(ang) * dist}px`);
-      p.style.setProperty('--dy', `${Math.sin(ang) * dist}px`);
-      p.style.left = `${rect.left - field.left + rect.width / 2}px`;
-      p.style.top = `${rect.top - field.top + rect.height / 2}px`;
-      $('playfield').appendChild(p);
-      setTimeout(() => p.remove(), 450);
-    }
-    setTimeout(() => el.remove(), 400);
   }
 
   let measuredLatMs = 0; // from the count-in phase
@@ -296,8 +238,6 @@
     $('gameOver').style.display = 'none';
     $('tapFeedback').textContent = '—';
     $('comboVal').textContent = '—';
-    liveBubbles.forEach(b => b.el.remove()); liveBubbles.length = 0;
-    $('playfield').querySelectorAll('.bubble,.pop').forEach(n => n.remove());
     $('scoreVal').textContent = '—';
     $('latVal').textContent = '—';
     $('phaseVal').textContent = 'Count-in: tap on each beep (8)…';
@@ -318,17 +258,16 @@
       measuredLatMs = currentAvgLatMs();
       emaLat = measuredLatMs;
       $('latVal').textContent = `${measuredLatMs.toFixed(0)} ms`;
-      $('phaseVal').textContent = 'Go! Burst the bubbles on the beat';
+      $('phaseVal').textContent = 'Go! Tap on each flash';
       const t1 = gCtx.currentTime + 0.5;
       for (let i = 0; i < BEAT_COUNT; i++) {
         const bt = t1 + i * BEAT_INTERVAL;
         beats.push(bt);
         playClick(bt);
-        spawnBubble(bt);
-        const delayMs = (bt - gCtx.currentTime) * 1000 + measuredLatMs;
+        const delayMs = (bt - gCtx.currentTime) * 1000 + emaLat;
         beatTimers.push(setTimeout(() => flash(delayMs), Math.max(0, delayMs)));
       }
-      beatTimers.push(setTimeout(endGame, (t1 + BEAT_COUNT * BEAT_INTERVAL - gCtx.currentTime) * 1000 + measuredLatMs + 400));
+      beatTimers.push(setTimeout(endGame, (t1 + BEAT_COUNT * BEAT_INTERVAL - gCtx.currentTime) * 1000 + 800));
     }, (t0 + COUNT_IN * BEAT_INTERVAL - gCtx.currentTime) * 1000 + 200));
   }
 
@@ -353,16 +292,6 @@
     emaLat = emaLat === 0 ? j.rawErr : emaLat * 0.7 + j.rawErr * 0.3;
     $('latVal').textContent = `${emaLat.toFixed(0)} ms`;
     if (phase !== 'bubbles') return;
-    // burst the bubble nearest to this tap if the timing is good
-    if (Math.abs(j.err) <= 120) {
-      let target = null, td = Infinity;
-      for (const b of liveBubbles) { const d = Math.abs(tapT - b.beat); if (d < td) { td = d; target = b; } }
-      if (target) {
-        const i = liveBubbles.indexOf(target);
-        liveBubbles.splice(i, 1);
-        burstBubble(target.el);
-      }
-    }
     // per-tap feedback + combo scoring
     const fb = $('tapFeedback');
     const aerr = Math.abs(j.err);
