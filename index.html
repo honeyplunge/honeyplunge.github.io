@@ -114,7 +114,7 @@
 
     <div class="game">
       <h2>Rhythm Game — Feel your latency</h2>
-      <div class="subtitle">Tap the button (or press Space) exactly when the bar flashes — on each beat you <em>hear</em>. Every 4th beat is a lower-pitched downbeat. On Bluetooth the beat arrives late; watch how compensation changes your score.</div>
+      <div class="subtitle">Each 2-second bar has a low-pitched <strong>downbeat</strong> plus three lighter beeps — tap the button (or press Space) only on the downbeat, when you <em>hear</em> it. On Bluetooth it arrives late; watch how compensation changes your score.</div>
       <div id="beatDot"></div>
       <button id="tapBtn" disabled>TAP ON THE BEAT</button>
       <div class="row">
@@ -191,9 +191,10 @@
   const $ = (id) => document.getElementById(id);
 
   /* ── Rhythm game (OSS only) ─────────────────────────── */
-  const BEAT_INTERVAL = 1.6;   // seconds between beats (long enough to avoid aliasing ~1.1s BT delay)
-  const COUNT_IN = 4;          // calibration downbeats
-  const BEAT_COUNT = 16;
+  const SUB = 0.5;             // seconds between sub-beeps within a 2s bar
+  const BAR = 2.0;             // seconds per bar; downbeat at bar start (long enough to avoid aliasing ~1.1s BT delay)
+  const COUNT_IN = 4;          // calibration downbeats (one per bar)
+  const BEAT_COUNT = 8;        // bars in the main round
   let gSync = null, gCtx = null;
   let beats = [];              // scheduled beat times on the audio clock
   let taps = [];               // tap times on the audio clock
@@ -223,7 +224,7 @@
     for (const t of taps) {
       let best = beats[0], bd = Infinity;
       for (const b of beats) { const d = Math.abs(t - b); if (d < bd) { bd = d; best = b; } }
-      if (bd <= BEAT_INTERVAL / 2) { sum += (t - best) * 1000; n++; }
+      if (bd <= BAR * 0.45) { sum += (t - best) * 1000; n++; }
     }
     return n ? sum / n : 0;
   }
@@ -241,43 +242,43 @@
     $('comboVal').textContent = '—';
     $('scoreVal').textContent = '—';
     $('latVal').textContent = '—';
-    $('phaseVal').textContent = 'Count-in: tap only on the low-pitched downbeat (4)…';
+    $('phaseVal').textContent = 'Count-in: tap only on the low-pitched downbeat (4 bars)…';
     $('tapBtn').disabled = false;
     $('gameStartBtn').disabled = true;
     const t0 = gCtx.currentTime + 0.8;
-    // Phase 1: count-in downbeeps to measure latency
+    // Phase 1: count-in — one accented downbeat per 2s bar, tap only on those
     for (let i = 0; i < COUNT_IN; i++) {
-      const bt = t0 + i * BEAT_INTERVAL;
+      const bt = t0 + i * BAR;
       beats.push(bt);
-      playClick(bt, true); // every count-in beat is a downbeat
+      playClick(bt, true);
       const delayMs = (bt - gCtx.currentTime) * 1000;
-      beatTimers.push(setTimeout(() => flash(delayMs), Math.max(0, delayMs)));
+      beatTimers.push(setTimeout(() => flash(delayMs, true), Math.max(0, delayMs)));
     }
-    // Phase 2: bubble beats, visuals aligned to the heard beat using measured latency
+    // Phase 2: main round — each 2s bar = downbeat + 3 sub-beeps; tap only on downbeats
     beatTimers.push(setTimeout(() => {
       phase = 'bubbles';
       measuredLatMs = currentAvgLatMs();
       emaLat = measuredLatMs;
       $('latVal').textContent = `${measuredLatMs.toFixed(0)} ms`;
-      $('phaseVal').textContent = 'Go! Tap on each flash (downbeats are lower-pitched)';
-      const t1 = gCtx.currentTime + 0.5;
+      $('phaseVal').textContent = 'Go! Tap only on the low-pitched downbeat (every 2 s)';
+      const t1 = gCtx.currentTime + 0.8;
       for (let i = 0; i < BEAT_COUNT; i++) {
-        const bt = t1 + i * BEAT_INTERVAL;
-        beats.push(bt);
-        const down = i % 4 === 0;
-        playClick(bt, down);
-        const delayMs = (bt - gCtx.currentTime) * 1000 + emaLat;
-        beatTimers.push(setTimeout(() => flash(delayMs, down), Math.max(0, delayMs)));
+        const barStart = t1 + i * BAR;
+        beats.push(barStart); // downbeat is the scored beat
+        playClick(barStart, true);
+        for (let s = 1; s <= 3; s++) playClick(barStart + s * SUB, false); // 3 sub-beeps inside the bar
+        const delayMs = (barStart - gCtx.currentTime) * 1000 + emaLat;
+        beatTimers.push(setTimeout(() => flash(delayMs, true), Math.max(0, delayMs)));
       }
-      beatTimers.push(setTimeout(endGame, (t1 + BEAT_COUNT * BEAT_INTERVAL - gCtx.currentTime) * 1000 + 800));
-    }, (t0 + COUNT_IN * BEAT_INTERVAL - gCtx.currentTime) * 1000 + 200));
+      beatTimers.push(setTimeout(endGame, (t1 + BEAT_COUNT * BAR - gCtx.currentTime) * 1000 + 800));
+    }, (t0 + COUNT_IN * BAR - gCtx.currentTime) * 1000 + 400));
   }
 
   function judge(tapT) {
     // nearest beat
     let best = beats[0], bd = Infinity;
     for (const b of beats) { const d = Math.abs(tapT - b); if (d < bd) { bd = d; best = b; } }
-    if (bd > BEAT_INTERVAL * 0.45) return null; // not near any beat (wide window: BT delay can exceed half interval)
+    if (bd > BAR * 0.45) return null; // not near any downbeat (wide window: BT delay can exceed half bar)
     const rawErr = (tapT - best) * 1000; // ms; positive = tapped late
     let err = rawErr;
     if ($('compensateChk').checked && emaLat) err -= emaLat;
