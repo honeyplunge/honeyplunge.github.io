@@ -45,7 +45,7 @@
   #beatDot.on { background:var(--accent); }
   #playfield { position:relative; width:100%; height:180px; border-radius:10px; background:#0d1626; border:1px solid var(--line); overflow:hidden; }
   #hitLine { position:absolute; left:0; right:0; top:24px; height:3px; background:var(--accent); opacity:.7; }
-  .bubble { position:absolute; width:44px; height:44px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #bff3ff, var(--accent) 60%, #1a7fa8); box-shadow:0 0 14px rgba(56,225,255,.5); transform:translate(-50%,-50%); }
+  .bubble { position:absolute; width:44px; height:44px; border-radius:50%; background:radial-gradient(circle at 35% 30%, hsl(var(--h) 90% 80%), hsl(var(--h) 85% 55%) 60%, hsl(var(--h) 80% 35%)); box-shadow:0 0 14px hsl(var(--h) 90% 60% / .5); transform:translate(-50%,-50%); }
   .bubble.miss { background:radial-gradient(circle at 35% 30%, #9aa4b2, #4b5563 60%, #1f2937); box-shadow:none; }
   .bubble.burst { animation:burst .35s forwards; }
   @keyframes burst { to { transform:translate(-50%,-50%) scale(2.2); opacity:0; } }
@@ -121,7 +121,7 @@
     </div>
 
     <div class="game">
-      <h2>Rhythm test — feel your latency</h2>
+      <h2>Rhythm Game — Feel your latency</h2>
       <div class="subtitle">Tap the button (or press Space) exactly when the bubble crosses the line — on each beat you <em>hear</em>. On Bluetooth the beat arrives late; watch how compensation changes your score.</div>
       <div id="playfield"><div id="hitLine"></div></div>
       <div id="beatDot"></div>
@@ -136,7 +136,7 @@
   </div>
 
   <div class="test">
-    <h2>A/V Sync Test — try it here</h2>
+    <h2>A/V Syncing — Try it Here</h2>
     <div class="subtitle">Drop a local video file: its sound plays through your (possibly Bluetooth-delayed) output while the picture renders on a canvas with an adjustable delay, so you can align them by ear.</div>
 
     <div class="btn-row">
@@ -219,6 +219,7 @@
     const field = $('playfield');
     const el = document.createElement('div');
     el.className = 'bubble';
+    el.style.setProperty('--h', Math.floor(Math.random() * 360));
     el.style.left = `${50 + (Math.random() * 30 - 15)}%`;
     el.style.top = '100%';
     field.appendChild(el);
@@ -247,6 +248,7 @@
     for (let i = 0; i < 10; i++) {
       const p = document.createElement('div');
       p.className = 'pop';
+      p.style.background = `hsl(${el.style.getPropertyValue('--h') || 190} 90% 60%)`;
       const ang = Math.random() * Math.PI * 2;
       const dist = 40 + Math.random() * 50;
       p.style.setProperty('--dx', `${Math.cos(ang) * dist}px`);
