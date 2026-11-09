@@ -310,10 +310,10 @@
         beats.push(bt);
         playClick(bt);
         spawnBubble(bt);
-        const delayMs = (bt - gCtx.currentTime) * 1000;
+        const delayMs = (bt - gCtx.currentTime) * 1000 + measuredLatMs;
         beatTimers.push(setTimeout(() => flash(delayMs), Math.max(0, delayMs)));
       }
-      beatTimers.push(setTimeout(endGame, (t1 + BEAT_COUNT * BEAT_INTERVAL - gCtx.currentTime) * 1000 + 400));
+      beatTimers.push(setTimeout(endGame, (t1 + BEAT_COUNT * BEAT_INTERVAL - gCtx.currentTime) * 1000 + measuredLatMs + 400));
     }, (t0 + COUNT_IN * BEAT_INTERVAL - gCtx.currentTime) * 1000 + 200));
   }
 
