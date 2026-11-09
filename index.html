@@ -218,6 +218,17 @@
     setTimeout(() => { dot.classList.remove('on'); dot.style.background = ''; dot.style.borderColor = ''; }, Math.min(ms, 300));
   }
 
+  function setBeatText(txt) {
+    const dot = $('beatDot');
+    dot.textContent = txt;
+    dot.style.display = 'flex';
+    dot.style.alignItems = 'center';
+    dot.style.justifyContent = 'center';
+    dot.style.color = 'rgba(6,34,43,.75)';
+    dot.style.fontWeight = '600';
+    dot.style.fontSize = '.95rem';
+  }
+
   function currentAvgLatMs() {
     if (!taps.length || !beats.length) return 0;
     let sum = 0, n = 0;
@@ -246,7 +257,9 @@
     $('tapBtn').disabled = false;
     $('gameStartBtn').disabled = true;
     const t0 = gCtx.currentTime + 0.8;
-    const countColors = ['#f87171', '#fbbf24', '#4ade80', '#4ade80']; // red, yellow, then green
+    setBeatText('Calculating… tap in time with the downbeat');
+    // count-in flash colors: bar 1 red, bar 2 yellow, bars 3..COUNT_IN green
+    const countColor = (i) => (i === 0 ? '#f87171' : i === 1 ? '#fbbf24' : '#4ade80');
     // Phase 1: count-in — one accented downbeat per 2s bar, tap only on those
     for (let i = 0; i < COUNT_IN; i++) {
       const bt = t0 + i * BAR;
@@ -254,8 +267,7 @@
       playClick(bt, true);
       for (let s = 1; s <= 3; s++) playClick(bt + s * SUB, false); // sub-beeps in count-in bars too
       const delayMs = (bt - gCtx.currentTime) * 1000;
-      const color = countColors[Math.min(i, countColors.length - 1)];
-      beatTimers.push(setTimeout(() => flash(delayMs, color), Math.max(0, delayMs)));
+      beatTimers.push(setTimeout(() => flash(delayMs, countColor(i)), Math.max(0, delayMs)));
     }
     // Phase 2: main round starts immediately after the last count-in bar — no gap
     const t1 = t0 + COUNT_IN * BAR;
@@ -265,6 +277,7 @@
       emaLat = measuredLatMs;
       $('latVal').textContent = `${measuredLatMs.toFixed(0)} ms`;
       $('phaseVal').textContent = 'Go! Tap only on the green downbeat (every 2 s)';
+      setBeatText('Game on!');
       for (let i = 0; i < BEAT_COUNT; i++) {
         const barStart = t1 + i * BAR;
         beats.push(barStart); // downbeat is the scored beat
@@ -318,6 +331,7 @@
     $('tapBtn').disabled = true;
     $('gameStartBtn').disabled = false;
     $('gameStartBtn').textContent = 'Restart';
+    setBeatText('');
     $('goStats').innerHTML =
       `Your audio delay: <strong style="color:var(--text)">${emaLat.toFixed(0)} ms</strong><br>` +
       `Score: <strong style="color:var(--text)">${score} pts</strong> · Best combo: <strong style="color:var(--text)">x${bestCombo}</strong><br>` +
