@@ -193,7 +193,7 @@
   /* ── Rhythm game (OSS only) ─────────────────────────── */
   const SUB = 0.5;             // seconds between sub-beeps within a 2s bar
   const BAR = 2.0;             // seconds per bar; downbeat at bar start (long enough to avoid aliasing ~1.1s BT delay)
-  const COUNT_IN = 4;          // calibration downbeats (one per bar)
+  const COUNT_IN = 8;          // calibration downbeats (one per bar)
   const BEAT_COUNT = 8;        // bars in the main round
   let gSync = null, gCtx = null;
   let beats = [];              // scheduled beat times on the audio clock
@@ -242,7 +242,7 @@
     $('comboVal').textContent = '—';
     $('scoreVal').textContent = '—';
     $('latVal').textContent = '—';
-    $('phaseVal').textContent = 'Count-in: tap the downbeat — flash goes red → yellow → green (4 bars)…';
+    $('phaseVal').textContent = 'Count-in: tap the downbeat — flash goes red → yellow → green (8 bars)…';
     $('tapBtn').disabled = false;
     $('gameStartBtn').disabled = true;
     const t0 = gCtx.currentTime + 0.8;
