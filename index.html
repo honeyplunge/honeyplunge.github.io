@@ -130,6 +130,7 @@
         <button class="small" id="gameStartBtn">Start</button>
         <label><input type="checkbox" id="compensateChk" checked> compensate latency</label>
       </div>
+      <div class="stat"><span class="label" id="phaseVal">Get ready — tap the 8 count-in beeps</span></div>
       <div class="stat"><span class="label">Measured audio delay: </span><span class="val" id="latVal">—</span></div>
       <div class="stat"><span class="label">Score: </span><span class="val" id="scoreVal">—</span> <span class="label">(perfect ≤60ms, good ≤120ms)</span></div>
     </div>
@@ -191,6 +192,7 @@
 
   /* ── Rhythm game (OSS only) ─────────────────────────── */
   const BEAT_INTERVAL = 0.6;   // seconds between beats
+  const COUNT_IN = 8;          // calibration beats before bubbles
   const BEAT_COUNT = 16;
   let gSync = null, gCtx = null;
   let beats = [];              // scheduled beat times on the audio clock
@@ -236,7 +238,7 @@
     const dur = (bt - gCtx.currentTime) * 1000;
     // With compensation on, delay the visual so the bubble crosses the line
     // when the beat is actually HEARD (beat + measured latency), not when scheduled
-    const visDelay = $('compensateChk').checked ? Math.max(0, currentAvgLatMs()) : 0;
+    const visDelay = Math.max(0, measuredLatMs); // align visuals to the heard beat
     el.animate(
       [{ top: '100%' }, { top: '27px' }],
       { duration: Math.max(50, dur), delay: visDelay, easing: 'linear', fill: 'forwards' }
@@ -274,24 +276,45 @@
     setTimeout(() => el.remove(), 400);
   }
 
+  let measuredLatMs = 0; // from the count-in phase
+  let phase = 'countin';
+  let scoredTaps = [];
+
   function startGame() {
-    taps = []; beats = []; playing = true;
+    taps = []; beats = []; scoredTaps = []; phase = 'countin'; playing = true;
     liveBubbles.forEach(b => b.el.remove()); liveBubbles.length = 0;
     $('playfield').querySelectorAll('.bubble,.pop').forEach(n => n.remove());
     $('scoreVal').textContent = '—';
     $('latVal').textContent = '—';
+    $('phaseVal').textContent = 'Count-in: tap on each beep (8)…';
     $('tapBtn').disabled = false;
     $('gameStartBtn').disabled = true;
-    const t0 = gCtx.currentTime + 0.5;
-    for (let i = 0; i < BEAT_COUNT; i++) {
+    const t0 = gCtx.currentTime + 0.8;
+    // Phase 1: count-in beeps to measure latency
+    for (let i = 0; i < COUNT_IN; i++) {
       const bt = t0 + i * BEAT_INTERVAL;
       beats.push(bt);
       playClick(bt);
-      spawnBubble(bt);
       const delayMs = (bt - gCtx.currentTime) * 1000;
       beatTimers.push(setTimeout(() => flash(delayMs), Math.max(0, delayMs)));
     }
-    beatTimers.push(setTimeout(endGame, (t0 + BEAT_COUNT * BEAT_INTERVAL - gCtx.currentTime) * 1000 + 400));
+    // Phase 2: bubble beats, visuals aligned to the heard beat using measured latency
+    beatTimers.push(setTimeout(() => {
+      phase = 'bubbles';
+      measuredLatMs = currentAvgLatMs();
+      $('latVal').textContent = `${measuredLatMs.toFixed(0)} ms`;
+      $('phaseVal').textContent = 'Go! Burst the bubbles on the beat';
+      const t1 = gCtx.currentTime + 0.5;
+      for (let i = 0; i < BEAT_COUNT; i++) {
+        const bt = t1 + i * BEAT_INTERVAL;
+        beats.push(bt);
+        playClick(bt);
+        spawnBubble(bt);
+        const delayMs = (bt - gCtx.currentTime) * 1000;
+        beatTimers.push(setTimeout(() => flash(delayMs), Math.max(0, delayMs)));
+      }
+      beatTimers.push(setTimeout(endGame, (t1 + BEAT_COUNT * BEAT_INTERVAL - gCtx.currentTime) * 1000 + 400));
+    }, (t0 + COUNT_IN * BEAT_INTERVAL - gCtx.currentTime) * 1000 + 200));
   }
 
   function judge(tapT) {
@@ -310,8 +333,9 @@
     if (!playing || !gCtx) return;
     const tapT = gCtx.currentTime;
     taps.push(tapT);
+    if (phase === 'bubbles') scoredTaps.push(tapT);
     const j = judge(tapT);
-    if (!j) return;
+    if (!j || phase !== 'bubbles') return;
     // burst the bubble nearest to this tap if the timing is good
     if (Math.abs(j.err) <= 120 || Math.abs(j.rawErr) <= 120) {
       let target = null, td = Infinity;
@@ -334,7 +358,7 @@
     $('latVal').textContent = `${avgRaw.toFixed(0)} ms`;
     const compensate = $('compensateChk').checked;
     let score = 0, n = 0;
-    for (const t of taps) {
+    for (const t of scoredTaps) {
       let best = beats[0], bd = Infinity;
       for (const b of beats) { const d = Math.abs(t - b); if (d < bd) { bd = d; best = b; } }
       let err = (t - best) * 1000;
@@ -347,6 +371,8 @@
 
   function endGame() {
     playing = false;
+    phase = 'countin';
+    scoredTaps = [];
     beatTimers.forEach(clearTimeout); beatTimers = [];
     $('tapBtn').disabled = true;
     $('gameStartBtn').disabled = false;
