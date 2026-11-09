@@ -132,7 +132,16 @@
       </div>
       <div class="stat"><span class="label" id="phaseVal">Get ready — tap the 8 count-in beeps</span></div>
       <div class="stat"><span class="label">Measured audio delay: </span><span class="val" id="latVal">—</span></div>
-      <div class="stat"><span class="label">Score: </span><span class="val" id="scoreVal">—</span> <span class="label">(perfect ≤60ms, good ≤120ms)</span></div>
+      <div class="stat"><span class="label">Score: </span><span class="val" id="scoreVal">—</span> <span class="label">Combo: </span><span class="val" id="comboVal">—</span></div>
+      <div class="stat" id="tapFeedback" style="font-family:monospace; font-weight:600; min-height:1.4em">—</div>
+      <div id="gameOver" style="display:none; background:#0d1626; border:1px solid var(--accent); border-radius:10px; padding:16px; text-align:center">
+        <div style="font-size:1.1rem; font-weight:700; margin-bottom:6px">Results</div>
+        <div id="goStats" style="color:var(--muted); font-size:.95rem; margin-bottom:12px"></div>
+        <div class="links" style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap">
+          <a class="btn ghost" style="padding:9px 16px; font-size:.9rem" href="https://github.com/honeyplunge/web-audio-sync">Get OSS free</a>
+          <a class="btn primary" style="padding:9px 16px; font-size:.9rem" href="https://buy.polar.sh/polar_cl_reU3RSYeSDkexCE4U7JwTS9N7fRcKA4pTyCam1KKBsl">Pro auto-compensates this</a>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -238,7 +247,7 @@
     const dur = (bt - gCtx.currentTime) * 1000;
     // With compensation on, delay the visual so the bubble crosses the line
     // when the beat is actually HEARD (beat + measured latency), not when scheduled
-    const visDelay = Math.max(0, measuredLatMs); // align visuals to the heard beat
+    const visDelay = Math.max(0, phase === 'bubbles' ? emaLat : measuredLatMs); // align visuals to the heard beat, tracking drift live
     el.animate(
       [{ top: '100%' }, { top: '27px' }],
       { duration: Math.max(50, dur), delay: visDelay, easing: 'linear', fill: 'forwards' }
@@ -277,11 +286,16 @@
   }
 
   let measuredLatMs = 0; // from the count-in phase
+  let emaLat = 0;        // live latency estimate (EMA over raw tap offsets)
   let phase = 'countin';
-  let scoredTaps = [];
+  let score = 0, combo = 0, bestCombo = 0;
 
   function startGame() {
-    taps = []; beats = []; scoredTaps = []; phase = 'countin'; playing = true;
+    taps = []; beats = []; phase = 'countin'; playing = true;
+    emaLat = 0; score = 0; combo = 0; bestCombo = 0;
+    $('gameOver').style.display = 'none';
+    $('tapFeedback').textContent = '—';
+    $('comboVal').textContent = '—';
     liveBubbles.forEach(b => b.el.remove()); liveBubbles.length = 0;
     $('playfield').querySelectorAll('.bubble,.pop').forEach(n => n.remove());
     $('scoreVal').textContent = '—';
@@ -302,6 +316,7 @@
     beatTimers.push(setTimeout(() => {
       phase = 'bubbles';
       measuredLatMs = currentAvgLatMs();
+      emaLat = measuredLatMs;
       $('latVal').textContent = `${measuredLatMs.toFixed(0)} ms`;
       $('phaseVal').textContent = 'Go! Burst the bubbles on the beat';
       const t1 = gCtx.currentTime + 0.5;
@@ -322,22 +337,24 @@
     let best = beats[0], bd = Infinity;
     for (const b of beats) { const d = Math.abs(tapT - b); if (d < bd) { bd = d; best = b; } }
     if (bd > BEAT_INTERVAL / 2) return null; // not near any beat
-    const compensate = $('compensateChk').checked;
-    let err = (tapT - best) * 1000; // ms; positive = tapped late
-    const avgLat = taps.length ? taps.reduce((a, t) => a + t, 0) / taps.length : 0;
-    if (compensate && avgLat) err -= avgLat * 1000;
-    return { rawErr: (tapT - best) * 1000, err };
+    const rawErr = (tapT - best) * 1000; // ms; positive = tapped late
+    let err = rawErr;
+    if ($('compensateChk').checked && emaLat) err -= emaLat;
+    return { rawErr, err };
   }
 
   function onTap() {
     if (!playing || !gCtx) return;
     const tapT = gCtx.currentTime;
     taps.push(tapT);
-    if (phase === 'bubbles') scoredTaps.push(tapT);
     const j = judge(tapT);
-    if (!j || phase !== 'bubbles') return;
+    if (!j) return;
+    // live latency estimate: EMA over raw offsets (tracks Bluetooth drift)
+    emaLat = emaLat === 0 ? j.rawErr : emaLat * 0.7 + j.rawErr * 0.3;
+    $('latVal').textContent = `${emaLat.toFixed(0)} ms`;
+    if (phase !== 'bubbles') return;
     // burst the bubble nearest to this tap if the timing is good
-    if (Math.abs(j.err) <= 120 || Math.abs(j.rawErr) <= 120) {
+    if (Math.abs(j.err) <= 120) {
       let target = null, td = Infinity;
       for (const b of liveBubbles) { const d = Math.abs(tapT - b.beat); if (d < td) { td = d; target = b; } }
       if (target) {
@@ -346,37 +363,31 @@
         burstBubble(target.el);
       }
     }
-    updateStats(j);
-  }
-
-  function updateStats(j) {
-    const avgRaw = taps.reduce((a, t, i) => {
-      let best = beats[0], bd = Infinity;
-      for (const b of beats) { const d = Math.abs(t - b); if (d < bd) { bd = d; best = b; } }
-      return a + (t - best) * 1000;
-    }, 0) / taps.length;
-    $('latVal').textContent = `${avgRaw.toFixed(0)} ms`;
-    const compensate = $('compensateChk').checked;
-    let score = 0, n = 0;
-    for (const t of scoredTaps) {
-      let best = beats[0], bd = Infinity;
-      for (const b of beats) { const d = Math.abs(t - b); if (d < bd) { bd = d; best = b; } }
-      let err = (t - best) * 1000;
-      if (compensate) err -= avgRaw;
-      if (Math.abs(err) <= 60) score += 100; else if (Math.abs(err) <= 120) score += 50;
-      n++;
-    }
-    $('scoreVal').textContent = n ? `${score} pts / ${n} taps` : '—';
+    // per-tap feedback + combo scoring
+    const fb = $('tapFeedback');
+    const aerr = Math.abs(j.err);
+    if (aerr <= 60) { fb.textContent = `${j.err >= 0 ? '+' : ''}${j.err.toFixed(0)} ms — PERFECT`; fb.style.color = '#4ade80'; combo++; }
+    else if (aerr <= 120) { fb.textContent = `${j.err >= 0 ? '+' : ''}${j.err.toFixed(0)} ms — good`; fb.style.color = '#fbbf24'; combo++; }
+    else { fb.textContent = `${j.err >= 0 ? '+' : ''}${j.err.toFixed(0)} ms — miss`; fb.style.color = '#f87171'; combo = 0; }
+    bestCombo = Math.max(bestCombo, combo);
+    const mult = Math.min(5, 1 + Math.floor(combo / 3));
+    if (aerr <= 60) score += 100 * mult; else if (aerr <= 120) score += 50 * mult;
+    $('scoreVal').textContent = `${score} pts`;
+    $('comboVal').textContent = combo > 1 ? `x${combo} (mult x${mult})` : '—';
   }
 
   function endGame() {
     playing = false;
     phase = 'countin';
-    scoredTaps = [];
     beatTimers.forEach(clearTimeout); beatTimers = [];
     $('tapBtn').disabled = true;
     $('gameStartBtn').disabled = false;
     $('gameStartBtn').textContent = 'Restart';
+    $('goStats').innerHTML =
+      `Your audio delay: <strong style="color:var(--text)">${emaLat.toFixed(0)} ms</strong><br>` +
+      `Score: <strong style="color:var(--text)">${score} pts</strong> · Best combo: <strong style="color:var(--text)">x${bestCombo}</strong><br>` +
+      `<span style="font-size:.85rem">That delay is why taps feel late on Bluetooth. WebAudio Sync Pro measures and compensates it automatically.</span>`;
+    $('gameOver').style.display = 'block';
   }
 
   $('gameStartBtn').addEventListener('click', async () => {
