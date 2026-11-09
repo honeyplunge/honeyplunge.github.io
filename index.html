@@ -215,6 +215,16 @@
   }
 
   const liveBubbles = []; // {el, beat}
+  function currentAvgLatMs() {
+    if (!taps.length || !beats.length) return 0;
+    let sum = 0, n = 0;
+    for (const t of taps) {
+      let best = beats[0], bd = Infinity;
+      for (const b of beats) { const d = Math.abs(t - b); if (d < bd) { bd = d; best = b; } }
+      if (bd <= BEAT_INTERVAL / 2) { sum += (t - best) * 1000; n++; }
+    }
+    return n ? sum / n : 0;
+  }
   function spawnBubble(bt) {
     const field = $('playfield');
     const el = document.createElement('div');
@@ -224,12 +234,15 @@
     el.style.top = '100%';
     field.appendChild(el);
     const dur = (bt - gCtx.currentTime) * 1000;
+    // With compensation on, delay the visual so the bubble crosses the line
+    // when the beat is actually HEARD (beat + measured latency), not when scheduled
+    const visDelay = $('compensateChk').checked ? Math.max(0, currentAvgLatMs()) : 0;
     el.animate(
       [{ top: '100%' }, { top: '27px' }],
-      { duration: Math.max(50, dur), easing: 'linear', fill: 'forwards' }
+      { duration: Math.max(50, dur), delay: visDelay, easing: 'linear', fill: 'forwards' }
     );
     liveBubbles.push({ el, beat: bt });
-    // remove shortly after the beat passes
+    // remove shortly after the (audible) beat passes
     setTimeout(() => {
       const i = liveBubbles.findIndex(b => b.el === el);
       if (i >= 0) {
@@ -237,7 +250,7 @@
         liveBubbles.splice(i, 1);
         setTimeout(() => el.remove(), 400);
       }
-    }, Math.max(50, dur) + 250);
+    }, Math.max(50, dur) + visDelay + 250);
   }
 
   function burstBubble(el) {
