@@ -251,6 +251,7 @@
       const bt = t0 + i * BAR;
       beats.push(bt);
       playClick(bt, true);
+      for (let s = 1; s <= 3; s++) playClick(bt + s * SUB, false); // sub-beeps in count-in bars too
       const delayMs = (bt - gCtx.currentTime) * 1000;
       beatTimers.push(setTimeout(() => flash(delayMs, true), Math.max(0, delayMs)));
     }
