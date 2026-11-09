@@ -218,13 +218,13 @@
     setTimeout(() => { dot.classList.remove('on'); dot.style.background = ''; dot.style.borderColor = ''; }, Math.min(ms, 300));
   }
 
-  function setBeatText(txt) {
+  function setBeatText(txt, color = null) {
     const dot = $('beatDot');
     dot.textContent = txt;
     dot.style.display = 'flex';
     dot.style.alignItems = 'center';
     dot.style.justifyContent = 'center';
-    dot.style.color = 'rgba(6,34,43,.75)';
+    dot.style.color = color || 'var(--muted)';
     dot.style.fontWeight = '600';
     dot.style.fontSize = '.95rem';
   }
@@ -257,7 +257,7 @@
     $('tapBtn').disabled = false;
     $('gameStartBtn').disabled = true;
     const t0 = gCtx.currentTime + 0.8;
-    setBeatText('Calculating… tap in time with the downbeat');
+    setBeatText('Get ready…', 'var(--muted)');
     // count-in flash colors: bar 1 red, bar 2 yellow, bars 3..COUNT_IN green
     const countColor = (i) => (i === 0 ? '#f87171' : i === 1 ? '#fbbf24' : '#4ade80');
     // Phase 1: count-in — one accented downbeat per 2s bar, tap only on those
@@ -267,7 +267,9 @@
       playClick(bt, true);
       for (let s = 1; s <= 3; s++) playClick(bt + s * SUB, false); // sub-beeps in count-in bars too
       const delayMs = (bt - gCtx.currentTime) * 1000;
-      beatTimers.push(setTimeout(() => flash(delayMs, countColor(i)), Math.max(0, delayMs)));
+      const color = countColor(i);
+      // countdown: colored text only, no flash
+      beatTimers.push(setTimeout(() => setBeatText(`Calculating… tap the downbeat (${i + 1}/${COUNT_IN})`, color), Math.max(0, delayMs)));
     }
     // Phase 2: main round starts immediately after the last count-in bar — no gap
     const t1 = t0 + COUNT_IN * BAR;
@@ -277,7 +279,7 @@
       emaLat = measuredLatMs;
       $('latVal').textContent = `${measuredLatMs.toFixed(0)} ms`;
       $('phaseVal').textContent = 'Go! Tap only on the green downbeat (every 2 s)';
-      setBeatText('Game on!');
+      setBeatText('Game on!', '#4ade80');
       for (let i = 0; i < BEAT_COUNT; i++) {
         const barStart = t1 + i * BAR;
         beats.push(barStart); // downbeat is the scored beat
