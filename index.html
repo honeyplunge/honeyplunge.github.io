@@ -258,8 +258,8 @@
     $('gameStartBtn').disabled = true;
     const t0 = gCtx.currentTime + 0.8;
     setBeatText('Get ready…', 'var(--muted)');
-    // count-in flash colors: bar 1 red, bar 2 yellow, bars 3..COUNT_IN green
-    const countColor = (i) => (i === 0 ? '#f87171' : i === 1 ? '#fbbf24' : '#4ade80');
+    // count-in text colors: first 4 bars red, remaining 4 orange
+    const countColor = (i) => (i < 4 ? '#f87171' : '#fb923c');
     // Phase 1: count-in — one accented downbeat per 2s bar, tap only on those
     for (let i = 0; i < COUNT_IN; i++) {
       const bt = t0 + i * BAR;
