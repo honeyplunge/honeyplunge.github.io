@@ -41,8 +41,16 @@
   .game { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px 24px 24px; display:flex; flex-direction:column; gap:12px; }
   .game h2 { font-size:1.25rem; }
   .game .subtitle { color:var(--muted); font-size:.92rem; }
-  #beatDot { width:100%; height:56px; border-radius:10px; background:#0d1626; border:1px solid var(--line); transition:background .05s; }
+  #beatDot { width:100%; height:56px; border-radius:10px; background:#0d1626; border:1px solid var(--line); transition:background .05s; position:relative; overflow:hidden; }
   #beatDot.on { background:var(--accent); }
+  #playfield { position:relative; width:100%; height:180px; border-radius:10px; background:#0d1626; border:1px solid var(--line); overflow:hidden; }
+  #hitLine { position:absolute; left:0; right:0; top:24px; height:3px; background:var(--accent); opacity:.7; }
+  .bubble { position:absolute; width:44px; height:44px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #bff3ff, var(--accent) 60%, #1a7fa8); box-shadow:0 0 14px rgba(56,225,255,.5); transform:translate(-50%,-50%); }
+  .bubble.miss { background:radial-gradient(circle at 35% 30%, #9aa4b2, #4b5563 60%, #1f2937); box-shadow:none; }
+  .bubble.burst { animation:burst .35s forwards; }
+  @keyframes burst { to { transform:translate(-50%,-50%) scale(2.2); opacity:0; } }
+  .pop { position:absolute; width:8px; height:8px; border-radius:50%; background:var(--accent); pointer-events:none; animation:pop .4s forwards; }
+  @keyframes pop { to { transform:translate(var(--dx), var(--dy)) scale(.2); opacity:0; } }
   #tapBtn { padding:18px; font-size:1.3rem; font-weight:700; border:none; border-radius:10px; background:var(--accent); color:#06222b; cursor:pointer; }
   #tapBtn:disabled { opacity:.35; cursor:default; }
   .game .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; font-size:.95rem; }
@@ -114,7 +122,8 @@
 
     <div class="game">
       <h2>Rhythm test — feel your latency</h2>
-      <div class="subtitle">Tap the button (or press Space) exactly on each beat you <em>hear</em>. On Bluetooth the beat arrives late — watch how compensation changes your score.</div>
+      <div class="subtitle">Tap the button (or press Space) exactly when the bubble crosses the line — on each beat you <em>hear</em>. On Bluetooth the beat arrives late; watch how compensation changes your score.</div>
+      <div id="playfield"><div id="hitLine"></div></div>
       <div id="beatDot"></div>
       <button id="tapBtn" disabled>TAP ON THE BEAT</button>
       <div class="row">
@@ -205,8 +214,55 @@
     setTimeout(() => dot.classList.remove('on'), Math.min(ms, 120));
   }
 
+  const liveBubbles = []; // {el, beat}
+  function spawnBubble(bt) {
+    const field = $('playfield');
+    const el = document.createElement('div');
+    el.className = 'bubble';
+    el.style.left = `${50 + (Math.random() * 30 - 15)}%`;
+    el.style.top = '100%';
+    field.appendChild(el);
+    const dur = (bt - gCtx.currentTime) * 1000;
+    el.animate(
+      [{ top: '100%' }, { top: '27px' }],
+      { duration: Math.max(50, dur), easing: 'linear', fill: 'forwards' }
+    );
+    liveBubbles.push({ el, beat: bt });
+    // remove shortly after the beat passes
+    setTimeout(() => {
+      const i = liveBubbles.findIndex(b => b.el === el);
+      if (i >= 0) {
+        if (!el.classList.contains('burst') && !el.classList.contains('miss')) el.classList.add('miss');
+        liveBubbles.splice(i, 1);
+        setTimeout(() => el.remove(), 400);
+      }
+    }, Math.max(50, dur) + 250);
+  }
+
+  function burstBubble(el) {
+    el.classList.remove('miss');
+    el.classList.add('burst');
+    const rect = el.getBoundingClientRect();
+    const field = $('playfield').getBoundingClientRect();
+    for (let i = 0; i < 10; i++) {
+      const p = document.createElement('div');
+      p.className = 'pop';
+      const ang = Math.random() * Math.PI * 2;
+      const dist = 40 + Math.random() * 50;
+      p.style.setProperty('--dx', `${Math.cos(ang) * dist}px`);
+      p.style.setProperty('--dy', `${Math.sin(ang) * dist}px`);
+      p.style.left = `${rect.left - field.left + rect.width / 2}px`;
+      p.style.top = `${rect.top - field.top + rect.height / 2}px`;
+      $('playfield').appendChild(p);
+      setTimeout(() => p.remove(), 450);
+    }
+    setTimeout(() => el.remove(), 400);
+  }
+
   function startGame() {
     taps = []; beats = []; playing = true;
+    liveBubbles.forEach(b => b.el.remove()); liveBubbles.length = 0;
+    $('playfield').querySelectorAll('.bubble,.pop').forEach(n => n.remove());
     $('scoreVal').textContent = '—';
     $('latVal').textContent = '—';
     $('tapBtn').disabled = false;
@@ -216,7 +272,7 @@
       const bt = t0 + i * BEAT_INTERVAL;
       beats.push(bt);
       playClick(bt);
-      // visual flash aligned via audio clock
+      spawnBubble(bt);
       const delayMs = (bt - gCtx.currentTime) * 1000;
       beatTimers.push(setTimeout(() => flash(delayMs), Math.max(0, delayMs)));
     }
@@ -240,7 +296,18 @@
     const tapT = gCtx.currentTime;
     taps.push(tapT);
     const j = judge(tapT);
-    if (j) updateStats(j);
+    if (!j) return;
+    // burst the bubble nearest to this tap if the timing is good
+    if (Math.abs(j.err) <= 120 || Math.abs(j.rawErr) <= 120) {
+      let target = null, td = Infinity;
+      for (const b of liveBubbles) { const d = Math.abs(tapT - b.beat); if (d < td) { td = d; target = b; } }
+      if (target) {
+        const i = liveBubbles.indexOf(target);
+        liveBubbles.splice(i, 1);
+        burstBubble(target.el);
+      }
+    }
+    updateStats(j);
   }
 
   function updateStats(j) {
