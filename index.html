@@ -394,10 +394,14 @@
 
   $('gameStartBtn').addEventListener('click', async () => {
     if (!gSync) {
-      if (!(await isSupported())) return;
+      const sup = await isSupported();
+      console.log('[game] isSupported:', sup);
+      if (!sup) { $('phaseVal').textContent = 'WebAudio not supported in this browser'; return; }
       gSync = createWebAudioSync({ tier: 'oss' });
-      await gSync.initialize();
+      const ok = await gSync.initialize();
+      console.log('[game] initialize:', ok);
       gCtx = gSync.getAudioContext();
+      console.log('[game] ctx:', gCtx?.state, gCtx?.sampleRate, 'dest:', gCtx?.destination?.channelCount);
     }
     if (gCtx.state === 'suspended') await gCtx.resume();
     // autoplay fallback: if still suspended, play a silent buffer inside the gesture
@@ -412,9 +416,10 @@
       } catch { /* ignore */ }
     }
     if (gCtx.state !== 'running') {
-      $('phaseVal').textContent = 'Audio blocked — click Start once more (browser autoplay policy)';
+      $('phaseVal').textContent = `Audio blocked (state=${gCtx.state}) — click Start once more`;
       return;
     }
+    $('phaseVal').textContent = `AudioContext running @ ${gCtx.sampleRate} Hz — count-in starting…`;
     startGame();
   });
   $('tapBtn').addEventListener('click', () => { if (gCtx && gCtx.state === 'suspended') gCtx.resume(); onTap(); });
