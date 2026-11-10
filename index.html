@@ -43,6 +43,11 @@
   .game .subtitle { color:var(--muted); font-size:.92rem; }
   #beatDot { width:100%; height:72px; border-radius:10px; background:#0d1626; border:2px solid var(--line); transition:background .05s, border-color .05s; }
   #beatDot.on { background:var(--accent); border-color:var(--accent); }
+  #lane { position:relative; width:100%; height:220px; border-radius:10px; background:#0d1626; border:1px solid var(--line); overflow:hidden; }
+  #hitLine { position:absolute; left:0; right:0; bottom:28px; height:4px; background:#4ade80; box-shadow:0 0 10px #4ade80; }
+  .note { position:absolute; left:50%; width:64px; height:22px; margin-left:-32px; border-radius:6px; background:linear-gradient(180deg,#bff3ff,#38e1ff); box-shadow:0 0 12px rgba(56,225,255,.6); }
+  .note.hit { background:#4ade80; box-shadow:0 0 16px #4ade80; }
+  .note.miss { background:#4b5563; box-shadow:none; }
   #tapBtn { padding:18px; font-size:1.3rem; font-weight:700; border:none; border-radius:10px; background:var(--accent); color:#06222b; cursor:pointer; }
   #tapBtn:disabled { opacity:.35; cursor:default; }
   .game .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; font-size:.95rem; }
@@ -114,7 +119,8 @@
 
     <div class="game">
       <h2>Rhythm Game — Feel your latency</h2>
-      <div class="subtitle">Each 4-second bar has a low-pitched <strong>downbeat</strong> plus three lighter beeps — tap the button (or press Space) only on the downbeat, when you <em>hear</em> it. On Bluetooth it arrives late; watch how compensation changes your score.</div>
+      <div class="subtitle">Each 4-second bar has a low-pitched <strong>downbeat</strong> plus three lighter beeps — tap the button (or press Space) only when the falling block crosses the green line, on the downbeat you <em>hear</em>. On Bluetooth it arrives late; watch how compensation changes your score.</div>
+      <div id="lane"><div id="hitLine"></div></div>
       <div id="beatDot"></div>
       <button id="tapBtn" disabled>TAP ON THE BEAT</button>
       <div class="row">
@@ -229,6 +235,32 @@
     dot.style.fontSize = '.95rem';
   }
 
+  const liveNotes = []; // {el, beat}
+  function spawnNote(barStart) {
+    const lane = $('lane');
+    const el = document.createElement('div');
+    el.className = 'note';
+    el.style.top = '-24px';
+    lane.appendChild(el);
+    const dur = (barStart - gCtx.currentTime) * 1000;
+    const visDelay = Math.max(0, emaLat); // block crosses the line when the beat is HEARD
+    const laneH = lane.clientHeight;
+    const targetTop = laneH - 28 - 22; // hit line minus note height
+    el.animate(
+      [{ top: '-24px' }, { top: `${targetTop}px` }],
+      { duration: Math.max(100, dur), delay: visDelay, easing: 'linear', fill: 'forwards' }
+    );
+    liveNotes.push({ el, beat: barStart });
+    setTimeout(() => {
+      const i = liveNotes.findIndex(n => n.el === el);
+      if (i >= 0) {
+        if (!el.classList.contains('hit')) el.classList.add('miss');
+        liveNotes.splice(i, 1);
+        setTimeout(() => el.remove(), 300);
+      }
+    }, Math.max(100, dur) + visDelay + 300);
+  }
+
   function currentAvgLatMs() {
     if (!taps.length || !beats.length) return 0;
     let sum = 0, n = 0;
@@ -248,6 +280,8 @@
   function startGame() {
     taps = []; beats = []; phase = 'countin'; playing = true;
     emaLat = 0; score = 0; combo = 0; bestCombo = 0;
+    liveNotes.forEach(n => n.el.remove()); liveNotes.length = 0;
+    $('lane').querySelectorAll('.note').forEach(n => n.remove());
     $('gameOver').style.display = 'none';
     $('tapFeedback').textContent = '—';
     $('comboVal').textContent = '—';
@@ -285,6 +319,7 @@
         beats.push(barStart); // downbeat is the scored beat
         playClick(barStart, true);
         for (let s = 1; s <= 3; s++) playClick(barStart + s * SUB, false); // 3 sub-beeps inside the bar
+        spawnNote(barStart);
         const delayMs = (barStart - gCtx.currentTime) * 1000 + emaLat;
         beatTimers.push(setTimeout(() => flash(delayMs, '#4ade80'), Math.max(0, delayMs)));
       }
@@ -313,6 +348,16 @@
     emaLat = emaLat === 0 ? j.rawErr : emaLat * 0.7 + j.rawErr * 0.3;
     $('latVal').textContent = `${emaLat.toFixed(0)} ms`;
     if (phase !== 'bubbles') return;
+    // hit the falling block nearest to this tap if timing is good
+    if (Math.abs(j.err) <= 120) {
+      let target = null, td = Infinity;
+      for (const n of liveNotes) { const d = Math.abs(tapT - n.beat); if (d < td) { td = d; target = n; } }
+      if (target) {
+        liveNotes.splice(liveNotes.indexOf(target), 1);
+        target.el.classList.add('hit');
+        setTimeout(() => target.el.remove(), 300);
+      }
+    }
     // per-tap feedback + combo scoring
     const fb = $('tapFeedback');
     const aerr = Math.abs(j.err);
