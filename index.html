@@ -23,6 +23,8 @@
   header { display:flex; align-items:center; gap:18px; padding:34px 6vw; border-bottom:1px solid var(--line); }
   header img { height:68px; width:auto; }
   header h1 { font-size:2rem; font-weight:700; letter-spacing:.5px; }
+  header .spacer { flex:1; }
+  header .pot { height:84px; width:84px; border-radius:50%; object-fit:cover; border:2px solid var(--line); }
   main { padding:56px 6vw 90px; max-width:1320px; margin:0 auto; }
   .intro { color:var(--muted); max-width:70ch; margin-bottom:48px; font-size:1.1rem; }
 
@@ -100,6 +102,8 @@
 <header>
   <img src="assets/keyboard.svg" alt="honeyplunge logo">
   <h1>honeyplunge</h1>
+  <span class="spacer"></span>
+  <img class="pot" src="assets/pot.svg" alt="pot" onerror="this.onerror=null;this.src='assets/pot.jpg'">
 </header>
 <main>
   <p class="intro">honeyplunge builds developer tools. Our first release is <strong>WebAudio Sync</strong> — precise audio synchronization for web apps, built for Bluetooth devices that add variable latency.</p>
