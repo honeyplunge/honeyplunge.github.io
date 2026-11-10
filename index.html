@@ -420,6 +420,8 @@
       return;
     }
     $('phaseVal').textContent = `AudioContext running @ ${gCtx.sampleRate} Hz — count-in starting…`;
+    playClick(gCtx.currentTime + 0.05, true); // immediate test beep
+    console.log('[game] test beep scheduled, state:', gCtx.state, 'currentTime:', gCtx.currentTime);
     startGame();
   });
   $('tapBtn').addEventListener('click', () => { if (gCtx && gCtx.state === 'suspended') gCtx.resume(); onTap(); });
