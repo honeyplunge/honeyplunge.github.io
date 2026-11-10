@@ -245,7 +245,7 @@
     el.style.top = '-24px';
     lane.appendChild(el);
     const dur = (barStart - gCtx.currentTime) * 1000;
-    const visDelay = Math.max(0, emaLat); // block crosses the line when the beat is HEARD
+    const visDelay = $('compensateChk').checked ? Math.max(0, emaLat) : 0; // compensated: cross when HEARD; raw: cross on schedule
     const laneH = lane.clientHeight;
     const targetTop = laneH - 28 - 22; // hit line minus note height
     el.animate(
@@ -322,7 +322,7 @@
         playClick(barStart, true);
         for (let s = 1; s <= 3; s++) playClick(barStart + s * SUB, false); // 3 sub-beeps inside the bar
         spawnNote(barStart);
-        const delayMs = (barStart - gCtx.currentTime) * 1000 + emaLat;
+        const delayMs = (barStart - gCtx.currentTime) * 1000 + ($('compensateChk').checked ? emaLat : 0);
         beatTimers.push(setTimeout(() => flash(delayMs, '#4ade80'), Math.max(0, delayMs)));
       }
       beatTimers.push(setTimeout(endGame, (t1 + BEAT_COUNT * BAR - gCtx.currentTime) * 1000 + 800));
