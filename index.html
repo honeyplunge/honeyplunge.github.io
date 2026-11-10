@@ -521,6 +521,11 @@
   });
   $('avPauseBtn').addEventListener('click', () => { video.pause(); log('Paused', 'warn'); });
   video.addEventListener('ended', () => log('Video ended', 'warn'));
+  video.addEventListener('error', () => {
+    const codes = { 1: 'aborted', 2: 'network error', 3: 'decode error', 4: 'format not supported' };
+    const e = video.error;
+    log(`Video error: ${e ? codes[e.code] || ('code ' + e.code) : 'unknown'} — on iOS use MP4 (H.264 video + AAC audio); try .webm on Android/Chrome`, 'warn');
+  });
 
   $('avInitBtn').disabled = false;
 </script>
