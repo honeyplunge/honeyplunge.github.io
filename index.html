@@ -400,9 +400,24 @@
       gCtx = gSync.getAudioContext();
     }
     if (gCtx.state === 'suspended') await gCtx.resume();
+    // autoplay fallback: if still suspended, play a silent buffer inside the gesture
+    if (gCtx.state !== 'running') {
+      try {
+        const buf = gCtx.createBuffer(1, 1, gCtx.sampleRate);
+        const src = gCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(gCtx.destination);
+        src.start();
+        await gCtx.resume();
+      } catch { /* ignore */ }
+    }
+    if (gCtx.state !== 'running') {
+      $('phaseVal').textContent = 'Audio blocked — click Start once more (browser autoplay policy)';
+      return;
+    }
     startGame();
   });
-  $('tapBtn').addEventListener('click', onTap);
+  $('tapBtn').addEventListener('click', () => { if (gCtx && gCtx.state === 'suspended') gCtx.resume(); onTap(); });
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' && !e.repeat) { e.preventDefault(); onTap(); }
   });
